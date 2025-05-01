@@ -13,8 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EPOL - Environmental Police Admin Dashboard",
+  title: "EPOL Admin",
   description: "Cabuyao City Environmental Police Integrated System",
+  icons: [
+    { rel: 'icon', url: '/favicon.jpg' },
+    { rel: 'apple-touch-icon', url: '/favicon.jpg' },
+  ],
 };
 
 export default function RootLayout({
@@ -24,6 +28,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="shortcut icon" href="/favicon.jpg" />
+        <link rel="icon" type="image/jpeg" sizes="32x32" href="/favicon.jpg" />
+        <link rel="icon" type="image/jpeg" sizes="16x16" href="/favicon.jpg" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/favicon.jpg" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
