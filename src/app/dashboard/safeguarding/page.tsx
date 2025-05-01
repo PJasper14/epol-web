@@ -1,10 +1,18 @@
+"use client";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Download, Filter, Search, ShieldAlert } from "lucide-react";
+import { AlertCircle, Download, Filter, Search, ShieldAlert, Clock, CheckCircle, AlertTriangle, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { useState } from "react";
 
 export default function SafeguardingRecordsPage() {
+  const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
   // Mock data for demonstration
   const incidentReports = [
     { 
@@ -16,7 +24,25 @@ export default function SafeguardingRecordsPage() {
       reportedBy: "John Doe", 
       status: "Open", 
       priority: "High",
-      description: "Large quantities of construction waste dumped near the river bank. Potential contamination risk."
+      description: "Large quantities of construction waste dumped near the river bank. Potential contamination risk.",
+      resolution: {
+        status: "Pending",
+        assignedTo: "Sarah Johnson",
+        lastUpdated: "2023-04-19T15:30:00",
+        notes: "Initial assessment completed. Waiting for cleanup team deployment.",
+        actions: [
+          {
+            date: "2023-04-19T14:45:00",
+            action: "Report received and logged",
+            by: "System"
+          },
+          {
+            date: "2023-04-19T15:00:00",
+            action: "Assigned to cleanup team",
+            by: "Sarah Johnson"
+          }
+        ]
+      }
     },
     { 
       id: "INC-2023-002", 
@@ -27,7 +53,30 @@ export default function SafeguardingRecordsPage() {
       reportedBy: "Jane Smith", 
       status: "In Progress", 
       priority: "Medium",
-      description: "Excessive smoke emissions observed from factory chimney. Residents complained about strong odor."
+      description: "Excessive smoke emissions observed from factory chimney. Residents complained about strong odor.",
+      resolution: {
+        status: "In Progress",
+        assignedTo: "Michael Chen",
+        lastUpdated: "2023-04-18T16:45:00",
+        notes: "Factory inspection scheduled for tomorrow. Preliminary air quality tests show elevated levels.",
+        actions: [
+          {
+            date: "2023-04-18T10:30:00",
+            action: "Report received and logged",
+            by: "System"
+          },
+          {
+            date: "2023-04-18T11:00:00",
+            action: "Air quality test conducted",
+            by: "Michael Chen"
+          },
+          {
+            date: "2023-04-18T16:45:00",
+            action: "Factory inspection scheduled",
+            by: "Michael Chen"
+          }
+        ]
+      }
     },
     { 
       id: "INC-2023-003", 
@@ -38,7 +87,35 @@ export default function SafeguardingRecordsPage() {
       reportedBy: "Alex Johnson", 
       status: "Closed", 
       priority: "High",
-      description: "Evidence of illegal hunting and trapping of protected species found during routine patrol."
+      description: "Evidence of illegal hunting and trapping of protected species found during routine patrol.",
+      resolution: {
+        status: "Resolved",
+        assignedTo: "David Wilson",
+        lastUpdated: "2023-04-17T18:30:00",
+        notes: "Suspects apprehended and evidence collected. Case handed over to wildlife protection unit.",
+        actions: [
+          {
+            date: "2023-04-17T08:00:00",
+            action: "Report received and logged",
+            by: "System"
+          },
+          {
+            date: "2023-04-17T09:15:00",
+            action: "Investigation team dispatched",
+            by: "David Wilson"
+          },
+          {
+            date: "2023-04-17T14:30:00",
+            action: "Suspects apprehended",
+            by: "David Wilson"
+          },
+          {
+            date: "2023-04-17T18:30:00",
+            action: "Case resolved and closed",
+            by: "David Wilson"
+          }
+        ]
+      }
     },
     { 
       id: "INC-2023-004", 
@@ -64,6 +141,54 @@ export default function SafeguardingRecordsPage() {
     },
   ];
 
+  // Filter incidents based on selected criteria
+  const filteredReports = incidentReports.filter(report => {
+    const matchesPriority = !selectedPriority || report.priority === selectedPriority;
+    const matchesStatus = !selectedStatus || report.status === selectedStatus;
+    const matchesSearch = !searchQuery || 
+      report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      report.location.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesPriority && matchesStatus && matchesSearch;
+  });
+
+  // Group incidents by priority for monitoring
+  const priorityGroups = {
+    Critical: filteredReports.filter(r => r.priority === "Critical"),
+    High: filteredReports.filter(r => r.priority === "High"),
+    Medium: filteredReports.filter(r => r.priority === "Medium"),
+    Low: filteredReports.filter(r => r.priority === "Low")
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "Critical":
+        return "bg-red-100 text-red-800 hover:bg-red-200";
+      case "High":
+        return "bg-orange-100 text-orange-800 hover:bg-orange-200";
+      case "Medium":
+        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200";
+      case "Low":
+        return "bg-green-100 text-green-800 hover:bg-green-200";
+      default:
+        return "bg-gray-100 text-gray-800 hover:bg-gray-200";
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Open":
+        return "bg-blue-100 text-blue-800 hover:bg-blue-200";
+      case "In Progress":
+        return "bg-purple-100 text-purple-800 hover:bg-purple-200";
+      case "Closed":
+        return "bg-green-100 text-green-800 hover:bg-green-200";
+      default:
+        return "bg-gray-100 text-gray-800 hover:bg-gray-200";
+    }
+  };
+
   return (
     <div>
       <div className="mb-6">
@@ -71,32 +196,130 @@ export default function SafeguardingRecordsPage() {
         <p className="text-gray-500">View and manage environmental incident reports</p>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-4">
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              type="search"
-              placeholder="Search incidents..."
-              className="pl-8 w-full"
-            />
-          </div>
-          <Button variant="outline" size="icon" className="h-10 w-10">
-            <Filter className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-1">
-            <AlertCircle className="h-4 w-4" />
-            <span>Status Filter</span>
-          </Button>
-          <Button variant="outline" className="gap-1">
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
-        </div>
+      {/* Priority Monitoring Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card className="border-red-200 hover:border-red-300 transition-colors">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Critical Priority</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{priorityGroups.Critical.length}</div>
+            <p className="text-xs text-gray-500 mt-1">Active incidents</p>
+          </CardContent>
+        </Card>
+        <Card className="border-orange-200 hover:border-orange-300 transition-colors">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">High Priority</CardTitle>
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{priorityGroups.High.length}</div>
+            <p className="text-xs text-gray-500 mt-1">Active incidents</p>
+          </CardContent>
+        </Card>
+        <Card className="border-yellow-200 hover:border-yellow-300 transition-colors">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Medium Priority</CardTitle>
+              <Clock className="h-4 w-4 text-yellow-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{priorityGroups.Medium.length}</div>
+            <p className="text-xs text-gray-500 mt-1">Active incidents</p>
+          </CardContent>
+        </Card>
+        <Card className="border-green-200 hover:border-green-300 transition-colors">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Low Priority</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{priorityGroups.Low.length}</div>
+            <p className="text-xs text-gray-500 mt-1">Active incidents</p>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Search and Filters */}
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <Input
+                  type="search"
+                  placeholder="Search incidents..."
+                  className="pl-8 w-full"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-10 w-10"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Priority</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {["Critical", "High", "Medium", "Low"].map((priority) => (
+                      <Button
+                        key={priority}
+                        variant={selectedPriority === priority ? "default" : "outline"}
+                        size="sm"
+                        className={`${getPriorityColor(priority)} ${selectedPriority === priority ? "ring-2 ring-offset-2" : ""}`}
+                        onClick={() => setSelectedPriority(selectedPriority === priority ? null : priority)}
+                      >
+                        {priority}
+                        {selectedPriority === priority && (
+                          <X className="ml-1 h-3 w-3" />
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Status</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {["Open", "In Progress", "Closed"].map((status) => (
+                      <Button
+                        key={status}
+                        variant={selectedStatus === status ? "default" : "outline"}
+                        size="sm"
+                        className={`${getStatusColor(status)} ${selectedStatus === status ? "ring-2 ring-offset-2" : ""}`}
+                        onClick={() => setSelectedStatus(selectedStatus === status ? null : status)}
+                      >
+                        {status}
+                        {selectedStatus === status && (
+                          <X className="ml-1 h-3 w-3" />
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Incident Reports Table */}
       <Card className="border-red-100">
         <CardHeader className="bg-red-50 rounded-t-lg border-b border-red-100">
           <div className="flex items-center justify-between">
@@ -121,12 +344,14 @@ export default function SafeguardingRecordsPage() {
                   <th className="text-left py-3 px-4 font-medium text-gray-500">Reported By</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-500">Priority</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-500">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-500">Assigned To</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-500">Last Updated</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {incidentReports.map((report) => (
-                  <tr key={report.id} className="border-b border-gray-100 hover:bg-gray-50">
+                {filteredReports.map((report) => (
+                  <tr key={report.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="py-3 px-4 font-medium">{report.id}</td>
                     <td className="py-3 px-4">
                       <div className="font-medium">{report.title}</div>
@@ -140,29 +365,43 @@ export default function SafeguardingRecordsPage() {
                     <td className="py-3 px-4">{report.reportedBy}</td>
                     <td className="py-3 px-4">
                       <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          report.priority === "Critical"
-                            ? "bg-red-100 text-red-800"
-                            : report.priority === "High"
-                            ? "bg-orange-100 text-orange-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getPriorityColor(report.priority)}`}
                       >
                         {report.priority}
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          report.status === "Open"
-                            ? "bg-blue-100 text-blue-800"
-                            : report.status === "In Progress"
-                            ? "bg-purple-100 text-purple-800"
-                            : "bg-green-100 text-green-800"
-                        }`}
-                      >
-                        {report.status}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(report.status)}`}
+                        >
+                          {report.status}
+                        </span>
+                        {report.resolution && (
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              report.resolution.status === "Pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : report.resolution.status === "In Progress"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-green-100 text-green-800"
+                            }`}
+                          >
+                            {report.resolution.status}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">{report.resolution?.assignedTo || "Unassigned"}</td>
+                    <td className="py-3 px-4">
+                      {report.resolution ? (
+                        <>
+                          <div className="text-sm">{new Date(report.resolution.lastUpdated).toLocaleDateString()}</div>
+                          <div className="text-xs text-gray-500">{new Date(report.resolution.lastUpdated).toLocaleTimeString()}</div>
+                        </>
+                      ) : (
+                        <div className="text-sm text-gray-500">Not updated</div>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <Button
@@ -180,7 +419,7 @@ export default function SafeguardingRecordsPage() {
             </table>
           </div>
           <div className="flex items-center justify-between p-4 border-t border-gray-100">
-            <div className="text-sm text-gray-500">Showing 5 of 24 reports</div>
+            <div className="text-sm text-gray-500">Showing {filteredReports.length} of {incidentReports.length} reports</div>
             <div className="flex gap-1">
               <Button variant="outline" size="sm" disabled>
                 Previous
