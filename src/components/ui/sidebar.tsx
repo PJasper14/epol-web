@@ -51,26 +51,29 @@ export function Sidebar() {
       icon: Boxes,
       variant: pathname?.includes('/dashboard/inventory') ? 'default' : 'ghost',
     },
-  
   ];
 
   return (
-    <aside className="fixed left-0 top-0 z-30 flex h-screen w-64 flex-col border-r bg-white">
-      <div className="flex h-14 items-center border-b px-4 py-4">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full overflow-hidden">
+    <aside className="fixed left-0 top-0 z-30 flex h-screen w-64 flex-col bg-red-600 text-white">
+      <div className="flex h-16 items-center border-b border-red-500 px-4 py-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full overflow-hidden bg-white p-1 ring-2 ring-white">
             <Image
               src="/images/EPOL LOGO.jpg"
               alt="EPOL Logo"
               width={32}
               height={32}
+              className="h-full w-full object-contain"
             />
           </div>
-          <span className="font-semibold text-red-700">EPOL Admin</span>
+          <div>
+            <span className="font-bold text-lg text-white">EPOL</span>
+            <span className="font-semibold text-sm text-white/80 block">Admin Panel</span>
+          </div>
         </div>
       </div>
       <div className="flex-1 overflow-auto py-2">
-        <nav className="grid items-start px-2 text-sm font-medium">
+        <nav className="grid gap-1 px-3 text-sm font-medium">
           {links.map((link, index) => {
             const Icon = link.icon;
             return (
@@ -78,31 +81,31 @@ export function Sidebar() {
                 key={index}
                 href={link.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 transition-all",
+                  "group flex items-center gap-3 rounded-2xl px-4 py-3 transition-all",
                   link.variant === 'default' 
-                    ? "bg-red-100 text-red-700 hover:bg-red-200" 
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    ? "bg-white text-red-600 shadow-sm" 
+                    : "text-white hover:bg-white hover:text-red-600 hover:shadow-sm"
                 )}
               >
                 <Icon 
                   className={cn(
-                    "h-5 w-5",
-                    link.variant === 'default' ? "text-red-700" : "text-gray-500"
+                    "h-5 w-5 transition-colors",
+                    link.variant === 'default' ? "text-red-600" : "text-white group-hover:text-red-600"
                   )} 
                 />
-                {link.title}
+                <span className="transition-colors">{link.title}</span>
               </Link>
             );
           })}
         </nav>
       </div>
-      <div className="mt-auto p-4 border-t">
+      <div className="mt-auto p-4 border-t border-red-500">
         <Link
           href="/"
-          className="flex items-center gap-3 rounded-lg border-2 border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 transition-all hover:bg-red-50"
+          className="group flex items-center justify-center gap-3 rounded-2xl bg-red-700 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-red-800"
         >
-          <LogOut className="h-5 w-5 text-red-600" />
-          Logout
+          <LogOut className="h-5 w-5 text-white transition-colors" />
+          <span className="transition-colors">Logout</span>
         </Link>
       </div>
     </aside>

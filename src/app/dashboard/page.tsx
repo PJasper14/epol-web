@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserCheck, ShieldAlert, Boxes, Activity } from "lucide-react";
+import { UserCheck, ShieldAlert, Boxes, Activity, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   return (
@@ -33,8 +34,11 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500 mt-1">17 of 20 staff clocked in</p>
           </CardContent>
           <CardFooter className="pt-0">
-            <Link href="/dashboard/attendance" className="text-sm text-red-600 hover:text-red-800">
-              View all records →
+            <Link href="/dashboard/attendance" className="w-full">
+              <Button variant="outline" className="w-full text-red-600 hover:text-red-800 border-red-500 hover:border-red-600 hover:bg-red-50">
+                View all records
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
             </Link>
           </CardFooter>
         </Card>
@@ -54,8 +58,11 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500 mt-1">New reports this week</p>
           </CardContent>
           <CardFooter className="pt-0">
-            <Link href="/dashboard/safeguarding" className="text-sm text-red-600 hover:text-red-800">
-              View all reports →
+            <Link href="/dashboard/safeguarding" className="w-full">
+              <Button variant="outline" className="w-full text-red-600 hover:text-red-800 border-red-500 hover:border-red-600 hover:bg-red-50">
+                View all reports
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
             </Link>
           </CardFooter>
         </Card>
@@ -75,8 +82,11 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500 mt-1">Items in inventory</p>
           </CardContent>
           <CardFooter className="pt-0">
-            <Link href="/dashboard/inventory" className="text-sm text-red-600 hover:text-red-800">
-              Manage inventory →
+            <Link href="/dashboard/inventory" className="w-full">
+              <Button variant="outline" className="w-full text-red-600 hover:text-red-800 border-red-500 hover:border-red-600 hover:bg-red-50">
+                Manage inventory
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
             </Link>
           </CardFooter>
         </Card>
