@@ -1,126 +1,47 @@
+"use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Box, Download, Filter, PlusCircle, Search, Boxes } from "lucide-react";
+import { Box, Download, Filter, PlusCircle, Search, Boxes, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
+import Link from "next/link";
+import { useInventory } from "@/contexts/InventoryContext";
 
 export default function InventoryPage() {
-  // Mock data for demonstration
-  const rawInventoryItems = [
-    { 
-      id: "INV-001", 
-      name: "Sako", 
-      quantity: 2000, 
-      unit: "Bundles", 
-      lastUpdated: "2023-04-18",
-    },
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Use the inventory context
+  const { inventoryItems: contextItems } = useInventory();
 
-    { 
-      id: "INV-002", 
-      name: "Dust Pan", 
-      quantity: 1200, 
-      unit: "Pcs", 
-      lastUpdated: "2023-04-16",
-      location: "Lab Storage"
-    },
-    { 
-      id: "INV-003", 
-      name: "Walis Tingting (Kaong)", 
-      quantity: 2400, 
-      unit: "Pcs", 
-      lastUpdated: "2023-04-10",
-    },
-
-    { 
-      id: "INV-004", 
-      name: "Knitted Gloves", 
-      quantity: 4000, 
-      unit: "Pairs", 
-      lastUpdated: "2023-04-15",
-    },
-
-    { 
-      id: "INV-005", 
-      name: "Rubber Gloves", 
-      quantity: 400, 
-      unit: "Pairs", 
-      lastUpdated: "2023-04-12",
-    },
-
-    { 
-      id: "INV-006", 
-      name: "Raincoat", 
-      quantity: 500, 
-      unit: "Pcs", 
-      lastUpdated: "2023-04-05",
-    },
-
-    { 
-      id: "INV-007", 
-      name: "Sickle (Karit) RS Brand", 
-      quantity: 0, 
-      unit: "Pcs", 
-      lastUpdated: "2023-04-14",
-    },
-
-    { 
-      id: "INV-008", 
-      name: "Panabas (Itak) RS Brand", 
-      quantity: 0, 
-      unit: "Pcs", 
-      lastUpdated: "2023-04-14",
-    },
-
-    { 
-      id: "INV-009", 
-      name: "Hasaan (WhetStone)", 
-      quantity: 14, 
-      unit: "Pcs", 
-      lastUpdated: "2023-04-14",
-    },
-
-    { 
-      id: "INV-010", 
-      name: "Boots", 
-      quantity: 500, 
-      unit: "Pairs", 
-      lastUpdated: "2023-04-14",
-    },
-
-    { 
-      id: "INV-011", 
-      name: "Kalaykay", 
-      quantity: 20, 
-      unit: "Pcs", 
-      lastUpdated: "2023-04-14",
-    },
-
-    { 
-      id: "INV-012", 
-      name: "Palang Lapard No.8", 
-      quantity: 125, 
-      unit: "Pcs", 
-      lastUpdated: "2023-04-14",
-    },
-
-    { 
-      id: "INV-013", 
-      name: "Asarol", 
-      quantity: 125, 
-      unit: "Pcs", 
-      lastUpdated: "2023-04-14",
-    },
-  ];
+  // Check if any filters are active (but don't include search)
+  const hasActiveFilters = selectedStatus !== null;
+  
+  // Check if any search or filters are active (for UI purposes)
+  const hasAnyFiltering = hasActiveFilters || searchQuery !== "";
 
   // Apply status logic based on quantity
-  const inventoryItems = rawInventoryItems.map(item => ({
+  const inventoryItems = contextItems.map(item => ({
     ...item,
     status: item.quantity === 0 
       ? "Out of Stock" 
-      : item.quantity < 21 
+      : item.quantity < item.threshold 
         ? "Low Stock" 
         : "In Stock"
   }));
+
+  // Filter inventory items based on selected criteria
+  const filteredItems = useMemo(() => {
+    return inventoryItems.filter(item => {
+      const matchesStatus = !selectedStatus || item.status === selectedStatus;
+      const matchesSearch = !searchQuery || 
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchQuery.toLowerCase());
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [inventoryItems, selectedStatus, searchQuery]);
 
   // Summary data
   const inventorySummary = {
@@ -129,6 +50,20 @@ export default function InventoryPage() {
     lowStockItems: inventoryItems.filter(item => item.status === "Low Stock").length,
     outOfStockItems: inventoryItems.filter(item => item.status === "Out of Stock").length,
     categories: 7,
+  };
+
+  // Get status color class
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "In Stock":
+        return "bg-green-100 text-green-800";
+      case "Low Stock":
+        return "bg-yellow-100 text-yellow-800";
+      case "Out of Stock":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
   };
 
   return (
@@ -196,31 +131,75 @@ export default function InventoryPage() {
         </Card>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-4">
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              type="search"
-              placeholder="Search inventory..."
-              className="pl-8 w-full"
-            />
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <Input
+                  type="search"
+                  placeholder="Search inventory..."
+                  className="pl-8 w-full"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Button 
+                variant={showFilters ? "default" : "outline"}
+                size="icon" 
+                className={`h-10 w-10 relative transition-all duration-200 ${
+                  showFilters 
+                    ? "bg-red-600 text-white hover:bg-red-700 shadow-md" 
+                    : "hover:bg-gray-100"
+                }`}
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className={`h-4 w-4 ${showFilters ? "text-white" : "text-gray-500"}`} />
+                {hasActiveFilters && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm">
+                    {[selectedStatus].filter(Boolean).length}
+                  </span>
+                )}
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" className="gap-1">
+                  <Download className="h-4 w-4" />
+                  <span>Export</span>
+                </Button>
+                <Button className="gap-1 bg-red-600 hover:bg-red-700">
+                  <PlusCircle className="h-4 w-4" />
+                  <span>Add Item</span>
+                </Button>
+              </div>
+            </div>
+
+            {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Status</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {["In Stock", "Low Stock", "Out of Stock"].map((status) => (
+                      <Button
+                        key={status}
+                        variant={selectedStatus === status ? "default" : "outline"}
+                        size="sm"
+                        className={`${getStatusColor(status)} ${selectedStatus === status ? "ring-2 ring-offset-2" : ""}`}
+                        onClick={() => setSelectedStatus(selectedStatus === status ? null : status)}
+                      >
+                        {status}
+                        {selectedStatus === status && (
+                          <X className="ml-1 h-3 w-3" />
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <Button variant="outline" size="icon" className="h-10 w-10">
-            <Filter className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-1">
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
-          <Button className="gap-1 bg-red-600 hover:bg-red-700">
-            <PlusCircle className="h-4 w-4" />
-            <span>Add Item</span>
-          </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-red-100">
         <CardHeader className="bg-red-50 rounded-t-lg border-b border-red-100">
@@ -249,7 +228,7 @@ export default function InventoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {inventoryItems.map((item) => (
+                {filteredItems.map((item) => (
                   <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4 font-medium">{item.id}</td>
                     <td className="py-3 px-4 font-medium">{item.name}</td>
@@ -276,18 +255,12 @@ export default function InventoryPage() {
                     <td className="py-3 px-4">
                       <div className="flex gap-2">
                         <Button
-                          variant="outline"
+                          variant="default"
                           size="sm"
-                          className="h-8 bg-blue-600 text-white hover:bg-blue-700 border-blue-600 hover:border-blue-700"
+                          className="h-8 px-3 font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+                          asChild
                         >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 bg-red-600 text-white hover:bg-red-700 border-red-600 hover:border-red-700"
-                        >
-                          Delete
+                          <Link href={`/dashboard/inventory/${item.id}`}>View Details</Link>
                         </Button>
                       </div>
                     </td>
@@ -297,7 +270,7 @@ export default function InventoryPage() {
             </table>
           </div>
           <div className="flex items-center justify-between p-4 border-t border-gray-100">
-            <div className="text-sm text-gray-500">Showing {inventoryItems.length} of {inventoryItems.length} items</div>
+            <div className="text-sm text-gray-500">Showing {filteredItems.length} of {inventoryItems.length} items</div>
             <div className="flex gap-1">
               <Button variant="outline" size="sm" disabled>
                 Previous
