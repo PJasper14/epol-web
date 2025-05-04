@@ -1,16 +1,18 @@
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Box, Download, Filter, PlusCircle, Search, Boxes, X } from "lucide-react";
+import { Box, Download, Filter, PlusCircle, Search, Boxes, X, ShoppingCart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useInventory } from "@/contexts/InventoryContext";
+import { generateInventoryPDF } from "@/utils/pdfExport";
 
 export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   // Use the inventory context
   const { inventoryItems: contextItems } = useInventory();
@@ -163,14 +165,45 @@ export default function InventoryPage() {
                 )}
               </Button>
               <div className="flex gap-2">
-                <Button variant="outline" className="gap-1">
-                  <Download className="h-4 w-4" />
-                  <span>Export</span>
+                <Button 
+                  variant="outline" 
+                  className="gap-1"
+                  onClick={() => {
+                    setIsExporting(true);
+                    // We need to wait for PDF generation to complete
+                    try {
+                      generateInventoryPDF(inventoryItems);
+                      // The PDF generation itself handles promise resolution
+                      // We'll set isExporting back to false after 2 seconds
+                      // to give enough time for the browser to process everything
+                      setTimeout(() => setIsExporting(false), 2000);
+                    } catch (error) {
+                      console.error("Error exporting PDF:", error);
+                      alert("There was an error generating the PDF. Please try again.");
+                      setIsExporting(false);
+                    }
+                  }}
+                  disabled={isExporting}
+                >
+                  {isExporting ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent"></div>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      <span>Export</span>
+                    </>
+                  )}
                 </Button>
-                <Button className="gap-1 bg-red-600 hover:bg-red-700">
+                <Link 
+                  href="/dashboard/inventory/purchase-order" 
+                  className="flex items-center gap-1 px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                >
                   <PlusCircle className="h-4 w-4" />
-                  <span>Add Item</span>
-                </Button>
+                  <span>Request Stock</span>
+                </Link>
               </div>
             </div>
 
@@ -271,14 +304,6 @@ export default function InventoryPage() {
           </div>
           <div className="flex items-center justify-between p-4 border-t border-gray-100">
             <div className="text-sm text-gray-500">Showing {filteredItems.length} of {inventoryItems.length} items</div>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" disabled>
-                Previous
-              </Button>
-              <Button variant="outline" size="sm" disabled>
-                Next
-              </Button>
-            </div>
           </div>
         </CardContent>
       </Card>

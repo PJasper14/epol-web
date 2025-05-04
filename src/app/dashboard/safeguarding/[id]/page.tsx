@@ -141,29 +141,29 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
                         <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white flex items-center" onClick={handleMarkInProgress}>
                           <Clock className="h-4 w-4 mr-1 text-white" />
                           Yes, Mark as In Progress
-                        </Button>
+                    </Button>
                         <Button size="sm" className="border border-gray-300 text-gray-700 hover:bg-gray-100" variant="outline" onClick={() => setShowInProgressConfirm(false)}>Cancel</Button>
                       </div>
                     </div>
                   </div>
                 )}
-                {showConfirm && (
-                  <div className="fixed inset-0 flex items-center justify-center z-50 bg-white/60">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-xs border border-gray-200">
-                      <div className="mb-4 text-center">
-                        <CheckCircle className="mx-auto mb-2 h-8 w-8 text-green-600" />
-                        <div className="font-semibold mb-2">Mark as Resolved?</div>
-                        <div className="text-gray-500 text-sm">Are you sure you want to mark this incident as resolved?</div>
+                    {showConfirm && (
+                      <div className="fixed inset-0 flex items-center justify-center z-50 bg-white/60">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-xs border border-gray-200">
+                          <div className="mb-4 text-center">
+                            <CheckCircle className="mx-auto mb-2 h-8 w-8 text-green-600" />
+                            <div className="font-semibold mb-2">Mark as Resolved?</div>
+                            <div className="text-gray-500 text-sm">Are you sure you want to mark this incident as resolved?</div>
+                          </div>
+                          <div className="flex gap-2 justify-center">
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex items-center" onClick={handleMarkResolved}>
+                              <CheckCircle className="h-4 w-4 mr-1 text-white" />
+                              Yes, Mark as Resolved
+                            </Button>
+                            <Button size="sm" className="border border-gray-300 text-gray-700 hover:bg-gray-100" variant="outline" onClick={() => setShowConfirm(false)}>Cancel</Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-2 justify-center">
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white flex items-center" onClick={handleMarkResolved}>
-                          <CheckCircle className="h-4 w-4 mr-1 text-white" />
-                          Yes, Mark as Resolved
-                        </Button>
-                        <Button size="sm" className="border border-gray-300 text-gray-700 hover:bg-gray-100" variant="outline" onClick={() => setShowConfirm(false)}>Cancel</Button>
-                      </div>
-                    </div>
-                  </div>
                 )}
               </div>
             </div>

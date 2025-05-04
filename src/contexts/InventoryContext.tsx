@@ -20,6 +20,7 @@ export interface Transaction {
   action: string;
   quantity: number;
   notes: string;
+  purchaseOrderId?: string; // Reference to purchase order if applicable
 }
 
 interface InventoryContextType {
@@ -28,6 +29,10 @@ interface InventoryContextType {
   getInventoryItem: (id: string) => InventoryItem | undefined;
   getInventoryTransactions: (itemId: string) => Transaction[];
   addTransaction: (itemId: string, transaction: Transaction) => void;
+  // New methods for purchase order integration
+  receivePurchaseOrder: (poId: string, itemUpdates: { itemId: string, quantity: number }[], receivedBy: string) => void;
+  getLowStockItems: () => InventoryItem[];
+  getOutOfStockItems: () => InventoryItem[];
 }
 
 // Create the context
@@ -211,6 +216,61 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  // Get items with quantity below threshold
+  const getLowStockItems = () => {
+    return items.filter(item => item.quantity > 0 && item.quantity < item.threshold);
+  };
+
+  // Get items with zero quantity
+  const getOutOfStockItems = () => {
+    return items.filter(item => item.quantity === 0);
+  };
+
+  // Receive items from a purchase order
+  const receivePurchaseOrder = (poId: string, itemUpdates: { itemId: string, quantity: number }[], receivedBy: string) => {
+    // Update each item's quantity
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Create a copy of the items array
+    const updatedItems = [...items];
+    
+    // Update each item and create transactions
+    itemUpdates.forEach(({ itemId, quantity }) => {
+      // Find the item index
+      const itemIndex = updatedItems.findIndex(item => item.id === itemId);
+      
+      if (itemIndex !== -1) {
+        // Update the item
+        const item = updatedItems[itemIndex];
+        updatedItems[itemIndex] = {
+          ...item,
+          quantity: item.quantity + quantity,
+          lastUpdated: today
+        };
+        
+        // Create a transaction
+        const newTransaction: Transaction = {
+          id: Math.max(0, ...(transactions[itemId] || []).map(t => t.id)) + 1,
+          date: today,
+          user: receivedBy,
+          action: "Add",
+          quantity: quantity,
+          notes: `Received from Purchase Order ${poId}`,
+          purchaseOrderId: poId
+        };
+        
+        // Add the transaction
+        setTransactions(prev => ({
+          ...prev,
+          [itemId]: [newTransaction, ...(prev[itemId] || [])]
+        }));
+      }
+    });
+    
+    // Update all items at once
+    setItems(updatedItems);
+  };
+
   return (
     <InventoryContext.Provider
       value={{
@@ -218,7 +278,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         updateInventoryItem,
         getInventoryItem,
         getInventoryTransactions,
-        addTransaction
+        addTransaction,
+        receivePurchaseOrder,
+        getLowStockItems,
+        getOutOfStockItems
       }}
     >
       {children}

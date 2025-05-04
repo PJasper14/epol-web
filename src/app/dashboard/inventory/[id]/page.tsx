@@ -26,7 +26,7 @@ export default function InventoryDetailsPage({ params }: { params: { id: string 
   
   // If item not found, return 404
   if (!item) {
-    return (
+  return (
       <div className="flex flex-col items-center justify-center h-[70vh] p-4">
         <Box className="h-16 w-16 text-gray-400 mb-4" />
         <h2 className="text-2xl font-bold text-gray-700 mb-2">Item Not Found</h2>
@@ -38,9 +38,9 @@ export default function InventoryDetailsPage({ params }: { params: { id: string 
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
           Return to Inventory
-        </Link>
-      </div>
-    );
+          </Link>
+    </div>
+  );
   }
 
   // Use the InventoryItemDetails component with our data

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "../styles/datepicker.css";
 import { InventoryProvider } from "@/contexts/InventoryContext";
+import { PurchaseOrderProvider } from "@/contexts/PurchaseOrderContext";
+import { IncidentProvider } from "@/app/dashboard/safeguarding/IncidentContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,7 +42,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
         <InventoryProvider>
-          {children}
+          <PurchaseOrderProvider>
+            <IncidentProvider>
+        {children}
+            </IncidentProvider>
+          </PurchaseOrderProvider>
         </InventoryProvider>
       </body>
     </html>

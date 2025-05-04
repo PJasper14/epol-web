@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useState } from "react";
 import { useIncidentContext } from "./IncidentContext";
+import { generateSafeguardingPDF } from "@/utils/safeguardingPdfExport";
 
 export default function SafeguardingRecordsPage() {
   const { incidents } = useIncidentContext();
@@ -14,6 +15,7 @@ export default function SafeguardingRecordsPage() {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Check if any filters are active (but don't include search)
   const hasActiveFilters = selectedPriority !== null || selectedStatus !== null;
@@ -32,6 +34,23 @@ export default function SafeguardingRecordsPage() {
 
     return matchesPriority && matchesStatus && matchesSearch;
   });
+
+  // Function to handle PDF export
+  const handleExportPDF = () => {
+    setIsExporting(true);
+    try {
+      // Use the selected/filtered incidents for export
+      const result = generateSafeguardingPDF(filteredReports);
+      if (!result) {
+        console.error("Failed to generate PDF");
+      }
+      // Set a timeout to reset the isExporting state to allow time for PDF generation
+      setTimeout(() => setIsExporting(false), 2000);
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      setIsExporting(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -128,6 +147,26 @@ export default function SafeguardingRecordsPage() {
                   <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm">
                     {[selectedPriority, selectedStatus].filter(Boolean).length}
                   </span>
+                )}
+              </Button>
+              
+              {/* Export Button */}
+              <Button 
+                variant="outline" 
+                className="hover:bg-gray-100 flex gap-2 items-center"
+                onClick={handleExportPDF}
+                disabled={isExporting || filteredReports.length === 0}
+              >
+                {isExporting ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent"></div>
+                    <span>Exporting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Export
+                  </>
                 )}
               </Button>
             </div>

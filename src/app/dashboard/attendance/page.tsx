@@ -1,7 +1,15 @@
+"use client";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Download, Filter, Search, UserCheck } from "lucide-react";
+import { Clock, Download, Filter, Search, UserCheck, X, Calendar as CalendarIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useState, useMemo } from "react";
+import { SingleDatePicker } from "@/components/ui/date-picker";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { generateAttendancePDF } from "@/utils/attendancePdfExport";
 
 // Helper function to calculate hours rendered
 function getHoursRendered(record: any) {
@@ -131,6 +139,13 @@ function getStatusColor(status: string) {
 }
 
 export default function AttendanceRecordsPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
   // Mock data for demonstration with updated schedule
   const attendanceRecords = [
     { id: 1, name: "John Doe", position: "Officer", date: "2023-04-19", clockIn: "02:30:45 PM", clockOut: "06:30:00 PM", status: "Present" },
@@ -144,6 +159,54 @@ export default function AttendanceRecordsPage() {
     { id: 9, name: "Michael Chen", position: "Officer", date: "2023-04-18", clockIn: "03:30:00 PM", clockOut: "06:30:00 PM", status: "Present" },
     { id: 10, name: "Sarah Wilson", position: "Officer", date: "2023-04-18", clockIn: "03:45:00 PM", clockOut: "06:30:00 PM", status: "Present" },
   ];
+
+  // Get unique positions and statuses for filter options
+  const positions = useMemo(() => 
+    Array.from(new Set(attendanceRecords.map(record => record.position))),
+    [attendanceRecords]
+  );
+
+  const statuses = useMemo(() => 
+    Array.from(new Set(attendanceRecords.map(record => getAttendanceStatus(record)))),
+    [attendanceRecords]
+  );
+
+  // Filter records based on search query and selected filters
+  const filteredRecords = useMemo(() => {
+    return attendanceRecords.filter(record => {
+      const matchesSearch = !searchQuery || 
+        record.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.position.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesPosition = !selectedPosition || record.position === selectedPosition;
+      
+      const recordStatus = getAttendanceStatus(record);
+      const matchesStatus = !selectedStatus || recordStatus === selectedStatus;
+      
+      // Check if record date matches selected date
+      const recordDate = new Date(record.date);
+      const matchesDate = !selectedDate || (
+        recordDate.getFullYear() === selectedDate.getFullYear() &&
+        recordDate.getMonth() === selectedDate.getMonth() &&
+        recordDate.getDate() === selectedDate.getDate()
+      );
+      
+      return matchesSearch && matchesPosition && matchesStatus && matchesDate;
+    });
+  }, [attendanceRecords, searchQuery, selectedPosition, selectedStatus, selectedDate]);
+
+  const handleExportPDF = async () => {
+    try {
+      setIsExporting(true);
+      await generateAttendancePDF(filteredRecords);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const hasActiveFilters = selectedPosition || selectedStatus;
 
   return (
     <div>
@@ -160,20 +223,83 @@ export default function AttendanceRecordsPage() {
               type="search"
               placeholder="Search records..."
               className="pl-8 w-full"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon" className="h-10 w-10">
-            <Filter className="h-4 w-4" />
-          </Button>
+          <Popover open={showFilters} onOpenChange={setShowFilters}>
+            <PopoverTrigger asChild>
+              <Button 
+                variant={showFilters ? "default" : "outline"}
+                size="icon" 
+                className={`h-10 w-10 relative transition-all duration-200 ${
+                  showFilters 
+                    ? "bg-red-600 text-white hover:bg-red-700 shadow-md" 
+                    : "hover:bg-gray-100"
+                }`}
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className={`h-4 w-4 ${showFilters ? "text-white" : "text-gray-500"}`} />
+                {hasActiveFilters && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm">
+                    {[selectedPosition, selectedStatus].filter(Boolean).length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 bg-white z-50 shadow-lg border">
+              <div className="font-semibold mb-2">Position</div>
+              <div className="flex gap-2 mb-4 flex-wrap">
+                {positions.map((position) => (
+                  <Button
+                    key={position}
+                    variant={selectedPosition === position ? "default" : "outline"}
+                    size="sm"
+                    className={selectedPosition === position ? "ring-2 ring-offset-2" : ""}
+                    onClick={() => setSelectedPosition(selectedPosition === position ? null : position)}
+                  >
+                    {position}
+                    {selectedPosition === position && <X className="ml-1 h-3 w-3" />}
+                  </Button>
+                ))}
+              </div>
+              <div className="font-semibold mb-2">Status</div>
+              <div className="flex gap-2 flex-wrap">
+                {statuses.map((status) => (
+                  <Button
+                    key={status}
+                    variant={selectedStatus === status ? "default" : "outline"}
+                    size="sm"
+                    className={`${getStatusColor(status)} ${selectedStatus === status ? "ring-2 ring-offset-2" : ""}`}
+                    onClick={() => setSelectedStatus(selectedStatus === status ? null : status)}
+                  >
+                    {status}
+                    {selectedStatus === status && <X className="ml-1 h-3 w-3" />}
+                  </Button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-1">
-            <Clock className="h-4 w-4" />
-            <span>Date Range</span>
-          </Button>
-          <Button variant="outline" className="gap-1">
-            <Download className="h-4 w-4" />
-            <span>Export</span>
+        <div className="flex gap-2 items-start">
+          <SingleDatePicker value={selectedDate} onChange={setSelectedDate} />
+          <Button 
+            variant="outline" 
+            className="hover:bg-gray-100 flex gap-2 items-center"
+            onClick={handleExportPDF}
+            disabled={isExporting || filteredRecords.length === 0}
+          >
+            {isExporting ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent"></div>
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                <span>Export</span>
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -205,7 +331,7 @@ export default function AttendanceRecordsPage() {
                 </tr>
               </thead>
               <tbody>
-                {attendanceRecords.map((record) => {
+                {filteredRecords.map((record) => {
                   const hoursRendered = getHoursRendered(record);
                   const status = getAttendanceStatus(record);
                   const statusColor = getStatusColor(status);
@@ -254,7 +380,7 @@ export default function AttendanceRecordsPage() {
             </table>
           </div>
           <div className="flex items-center justify-between p-4 border-t border-gray-100">
-            <div className="text-sm text-gray-500">Showing 8 of 24 records</div>
+            <div className="text-sm text-gray-500">Showing {filteredRecords.length} of {attendanceRecords.length} records</div>
             <div className="flex gap-1">
               <Button variant="outline" size="sm" disabled>
                 Previous
