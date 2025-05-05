@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generateAttendancePDF } from "@/utils/attendancePdfExport";
+import { EmployeeAttendanceModal } from "@/components/ui/EmployeeAttendanceModal";
 
 // Helper function to calculate hours rendered
 function getHoursRendered(record: any) {
@@ -87,36 +88,30 @@ function formatTime(time: string | null) {
 // Helper function to determine attendance status
 function getAttendanceStatus(record: any) {
   if (!record.clockIn && !record.clockOut) return "Absent";
-  
   const hoursRendered = getHoursRendered(record);
-  
-  // If clocked in but not yet 6:30 PM, show as On Duty
+  // If clocked in but not yet clocked out
   if (record.clockIn && !record.clockOut) {
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentTime = currentHour + (currentMinute / 60);
-    
-    if (currentTime < 18.5) { // 6:30 PM
+    // If before 6:30 PM, show as On Duty
+    if (currentTime < 18.5) {
       return "On Duty";
+    } else {
+      // After 6:30 PM, treat as Late
+      return "Late";
     }
   }
-
-  // Check for undertime first (less than 3h 30m)
   if (isUndertime(hoursRendered)) {
     return "Undertime";
   }
-  
-  // Then check for late clock-in
   if (isLate(record.clockIn)) {
     return "Late";
   }
-  
-  // If within allowable clock-in time and not undertime
   if (isAllowableClockIn(record.clockIn)) {
     return "Present";
   }
-  
   return "Present";
 }
 
@@ -145,6 +140,8 @@ export default function AttendanceRecordsPage() {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<{ name: string; position: string } | null>(null);
 
   // Mock data for demonstration with updated schedule
   const attendanceRecords = [
@@ -195,13 +192,19 @@ export default function AttendanceRecordsPage() {
     });
   }, [attendanceRecords, searchQuery, selectedPosition, selectedStatus, selectedDate]);
 
+  // Filter records for selected employee
+  const selectedEmployeeRecords = selectedEmployee
+    ? attendanceRecords.filter((rec) => rec.name === selectedEmployee.name)
+    : [];
+
   const handleExportPDF = async () => {
+    setIsExporting(true);
     try {
-      setIsExporting(true);
       await generateAttendancePDF(filteredRecords);
+      // Set a timeout to reset the isExporting state to allow time for PDF generation
+      setTimeout(() => setIsExporting(false), 2000);
     } catch (error) {
-      console.error('Error exporting PDF:', error);
-    } finally {
+      console.error("Error exporting PDF:", error);
       setIsExporting(false);
     }
   };
@@ -328,6 +331,7 @@ export default function AttendanceRecordsPage() {
                   <th className="text-left py-3 px-4 font-medium text-gray-500">Clock Out</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-500">Hours Rendered</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-500">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -373,6 +377,19 @@ export default function AttendanceRecordsPage() {
                           {status}
                         </span>
                       </td>
+                      <td className="py-3 px-4">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => {
+                            setSelectedEmployee({ name: record.name, position: record.position });
+                            setModalOpen(true);
+                          }}
+                        >
+                          View Details
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -392,6 +409,13 @@ export default function AttendanceRecordsPage() {
           </div>
         </CardContent>
       </Card>
+      <EmployeeAttendanceModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        employeeName={selectedEmployee?.name || ""}
+        employeePosition={selectedEmployee?.position || ""}
+        attendanceRecords={attendanceRecords}
+      />
     </div>
   );
 } 
