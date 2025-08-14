@@ -13,6 +13,8 @@ import {
   LogOut, 
   Settings, 
   Home,
+  Users,
+  MapPin,
   LucideIcon
 } from 'lucide-react';
 
@@ -50,6 +52,12 @@ export function Sidebar() {
       href: '/dashboard/inventory',
       icon: Boxes,
       variant: pathname?.includes('/dashboard/inventory') ? 'default' : 'ghost',
+    },
+    {
+      title: 'Employee Management',
+      href: '/dashboard/employees',
+      icon: Users,
+      variant: pathname?.includes('/dashboard/employees') ? 'default' : 'ghost',
     },
   ];
 

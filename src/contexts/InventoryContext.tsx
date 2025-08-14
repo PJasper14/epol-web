@@ -25,7 +25,9 @@ export interface Transaction {
 
 interface InventoryContextType {
   inventoryItems: InventoryItem[];
+  addInventoryItem: (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => void;
   updateInventoryItem: (updatedItem: InventoryItem) => void;
+  deleteInventoryItem: (id: string) => void;
   getInventoryItem: (id: string) => InventoryItem | undefined;
   getInventoryTransactions: (itemId: string) => Transaction[];
   addTransaction: (itemId: string, transaction: Transaction) => void;
@@ -198,6 +200,26 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  // Add a new inventory item
+  const addInventoryItem = (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => {
+    const newItem: InventoryItem = {
+      id: `INV-${items.length + 1}`, // Simple ID generation
+      ...item,
+      lastUpdated: new Date().toISOString().split('T')[0],
+    };
+    setItems(prevItems => [...prevItems, newItem]);
+  };
+
+  // Delete an inventory item
+  const deleteInventoryItem = (id: string) => {
+    setItems(prevItems => prevItems.filter(item => item.id !== id));
+    setTransactions(prev => {
+      const newState = { ...prev };
+      delete newState[id];
+      return newState;
+    });
+  };
+
   // Get a specific inventory item by ID
   const getInventoryItem = (id: string) => {
     return items.find(item => item.id === id);
@@ -275,7 +297,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     <InventoryContext.Provider
       value={{
         inventoryItems: items,
+        addInventoryItem,
         updateInventoryItem,
+        deleteInventoryItem,
         getInventoryItem,
         getInventoryTransactions,
         addTransaction,

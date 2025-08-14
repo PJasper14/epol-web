@@ -197,19 +197,6 @@ function generatePDFContent(doc: jsPDF, pageWidth: number, inventoryItems: Inven
   doc.text('Hon. Dennis Felipe C. Hain', rightX, signatureY + 18);
   doc.text('City Mayor', rightX, signatureY + 24);
   doc.text('City of Cabuyao', rightX, signatureY + 30);
-
-  // Table (red and white only)
-  autoTable(doc, {
-    head: [['Item ID', 'Item Name', 'Quantity', 'Unit']],
-    body: tableData,
-    theme: 'grid',
-    styles: { fontSize: 9 },
-    headStyles: { fillColor: [220, 53, 69], textColor: [255, 255, 255] }, // Red header, white text
-    bodyStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0] },     // White rows, black text
-    alternateRowStyles: { fillColor: [255, 255, 255] },                   // No gray/green
-    footStyles: { fillColor: [220, 53, 69], textColor: [255, 255, 255], fontStyle: 'bold' }, // Red footer, white text
-    foot: [['Total', '', totalItems.toString(), '']]
-  });
   
   // Add footer
   doc.setFont('helvetica', 'normal');
@@ -389,20 +376,6 @@ function generatePurchaseOrderPDFContent(doc: jsPDF, pageWidth: number, purchase
   doc.text('Hon. Dennis Felipe C. Hain', rightX, signatureY + 18);
   doc.text('City Mayor', rightX, signatureY + 24);
   doc.text('City of Cabuyao', rightX, signatureY + 30);
-
-  // Table (red and white only)
-  autoTable(doc, {
-    head: [['Item ID', 'Item Name', 'Quantity', 'Unit']],
-    body: tableData,
-    startY: 10 + logoHeight + 76 + notesHeight,
-    theme: 'grid',
-    styles: { fontSize: 9 },
-    headStyles: { fillColor: [220, 53, 69], textColor: [255, 255, 255] }, // Red header, white text
-    bodyStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0] },     // White rows, black text
-    alternateRowStyles: { fillColor: [255, 255, 255] },                   // No gray/green
-    footStyles: { fillColor: [220, 53, 69], textColor: [255, 255, 255], fontStyle: 'bold' }, // Red footer, white text
-    foot: [['Total', '', totalItems.toString(), '']]
-  });
   
   // Add footer
   doc.setFont('helvetica', 'normal');
