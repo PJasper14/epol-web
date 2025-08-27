@@ -328,6 +328,13 @@ export default function InventoryPage() {
                   <ShoppingCart className="h-4 w-4" />
                   <span>Request Stock</span>
                 </Link>
+                <Link 
+                  href="/dashboard/inventory/requests" 
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
+                >
+                  <Box className="h-4 w-4" />
+                  <span>Manage Requests</span>
+                </Link>
               </div>
             </div>
 
