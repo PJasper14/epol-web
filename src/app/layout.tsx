@@ -5,6 +5,7 @@ import "../styles/datepicker.css";
 import { InventoryProvider } from "@/contexts/InventoryContext";
 import { PurchaseOrderProvider } from "@/contexts/PurchaseOrderContext";
 import { IncidentProvider } from "@/app/dashboard/safeguarding/IncidentContext";
+import { PasswordResetProvider } from "@/contexts/PasswordResetContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,7 +45,9 @@ export default function RootLayout({
         <InventoryProvider>
           <PurchaseOrderProvider>
             <IncidentProvider>
-        {children}
+              <PasswordResetProvider>
+                {children}
+              </PasswordResetProvider>
             </IncidentProvider>
           </PurchaseOrderProvider>
         </InventoryProvider>

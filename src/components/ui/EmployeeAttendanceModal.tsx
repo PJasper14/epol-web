@@ -1,7 +1,21 @@
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { exportEmployeeDTR } from "@/utils/employeeDtrPdfExport";
+import { 
+  Clock, 
+  User, 
+  Calendar, 
+  Download, 
+  CheckCircle, 
+  X, 
+  AlertTriangle, 
+  Timer,
+  TrendingUp,
+  FileText
+} from "lucide-react";
 
 interface AttendanceRecord {
   id: number;
@@ -78,14 +92,27 @@ function getAttendanceStatus(record: AttendanceRecord) {
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentTime = currentHour + (currentMinute / 60);
-    // If before 6:30 PM, show as On Duty
-    if (currentTime < 18.5) {
-      return "On Duty";
+    
+    // Calculate expected clock out time (4 hours after clock in)
+    const clockInTime = record.clockIn;
+    const [time, period] = clockInTime.split(' ');
+    const [hours, minutes] = time.split(':').map(Number);
+    const hour24 = period === 'PM' ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
+    const clockInMinutes = (hour24 * 60) + minutes;
+    const expectedClockOutMinutes = clockInMinutes + (4 * 60); // 4 hours in minutes
+    const expectedClockOutHour = Math.floor(expectedClockOutMinutes / 60);
+    const expectedClockOutMinute = expectedClockOutMinutes % 60;
+    const expectedClockOutTime = expectedClockOutHour + (expectedClockOutMinute / 60);
+    
+    // If before expected clock out time, show as Present
+    if (currentTime < expectedClockOutTime) {
+      return "Present";
     } else {
-      // After 6:30 PM, treat as Late
-      return "Late";
+      // After expected clock out time without clocking out, treat as Absent
+      return "Absent";
     }
   }
+  
   if (isUndertime(hoursRendered)) {
     return "Undertime";
   }
@@ -96,6 +123,51 @@ function getAttendanceStatus(record: AttendanceRecord) {
     return "Present";
   }
   return "Present";
+}
+
+// Helper function to get status color and icon
+function getStatusInfo(status: string) {
+  switch (status) {
+    case "Present":
+      return {
+        color: "bg-green-100 text-green-800 border-green-200",
+        icon: CheckCircle,
+        iconColor: "text-green-600"
+      };
+    case "Absent":
+      return {
+        color: "bg-red-100 text-red-800 border-red-200",
+        icon: X,
+        iconColor: "text-red-600"
+      };
+    case "Late":
+      return {
+        color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+        icon: AlertTriangle,
+        iconColor: "text-yellow-600"
+      };
+    case "Undertime":
+      return {
+        color: "bg-orange-100 text-orange-800 border-orange-200",
+        icon: Timer,
+        iconColor: "text-orange-600"
+      };
+    default:
+      return {
+        color: "bg-gray-100 text-gray-800 border-gray-200",
+        icon: Clock,
+        iconColor: "text-gray-600"
+      };
+  }
+}
+
+// Helper function to format time to 12-hour format
+function formatTime(time: string | null) {
+  if (!time) return "Not recorded";
+  const [hours, minutes, seconds] = time.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 || 12;
+  return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
 export const EmployeeAttendanceModal: React.FC<EmployeeAttendanceModalProps> = ({
@@ -135,7 +207,7 @@ export const EmployeeAttendanceModal: React.FC<EmployeeAttendanceModalProps> = (
             <div className="text-gray-500 text-sm">{employeePosition}</div>
           </div>
           <Button
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-md"
+            className="bg-black hover:bg-gray-800 text-white font-semibold px-6 py-2 rounded-md"
             onClick={handleExportDTR}
           >
             Export DTR

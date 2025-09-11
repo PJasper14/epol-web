@@ -27,6 +27,11 @@ export default function PurchaseOrderPage() {
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   
+  // Validation state
+  const [validationErrors, setValidationErrors] = useState({
+    reason: ""
+  });
+  
   // Get completed orders
   const completedOrders = purchaseOrders.filter(order => order.status === "Completed");
   
@@ -71,7 +76,33 @@ export default function PurchaseOrderPage() {
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0 || !reason) return;
+    
+    // Reset validation errors
+    setValidationErrors({
+      reason: ""
+    });
+    
+    // Validate required fields
+    let hasErrors = false;
+    const errors = {
+      reason: ""
+    };
+    
+    if (!reason.trim()) {
+      errors.reason = "Reason for request is required";
+      hasErrors = true;
+    }
+    
+    if (items.length === 0) {
+      // You could add validation for items if needed
+      return;
+    }
+    
+    if (hasErrors) {
+      setValidationErrors(errors);
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       const newOrder: Omit<PurchaseOrder, "id"> = {
@@ -86,6 +117,7 @@ export default function PurchaseOrderPage() {
       setShowSuccessModal(true);
       setItems([]);
       setReason("");
+      setValidationErrors({ reason: "" });
     } catch (error) {
       console.error("Error creating purchase order:", error);
     } finally {
@@ -101,7 +133,7 @@ export default function PurchaseOrderPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Purchase Order Request</h1>
-          <p className="text-gray-500">Request new inventory items from suppliers</p>
+          <p className="text-gray-500">Request new inventory items from City Hall</p>
         </div>
         <Link 
           href="/dashboard/inventory" 
@@ -170,14 +202,24 @@ export default function PurchaseOrderPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">Reason for Request</label>
+                  <label className="text-sm font-medium text-gray-500">Reason for Request <span className="text-red-500">*</span></label>
                   <Textarea 
                     placeholder="Explain why these items are needed..."
                     value={reason}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
-                    required
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                      setReason(e.target.value);
+                      if (validationErrors.reason) {
+                        setValidationErrors({ ...validationErrors, reason: "" });
+                      }
+                    }}
+                    className={`border-gray-300 focus:border-red-500 focus:ring-red-500 ${
+                      validationErrors.reason ? 'border-red-500' : ''
+                    }`}
                     rows={4}
                   />
+                  {validationErrors.reason && (
+                    <p className="text-sm text-red-600 mt-1">{validationErrors.reason}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -257,7 +299,7 @@ export default function PurchaseOrderPage() {
                   type="button" 
                   onClick={handleAddItem}
                   disabled={!selectedItemId || quantity <= 0}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
@@ -322,7 +364,7 @@ export default function PurchaseOrderPage() {
                     <Button 
                       type="submit" 
                       className="w-full bg-red-600 hover:bg-red-700 text-white"
-                      disabled={items.length === 0 || !reason || isSubmitting}
+                      disabled={items.length === 0 || isSubmitting}
                     >
                       {isSubmitting ? 
                         <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div> : 

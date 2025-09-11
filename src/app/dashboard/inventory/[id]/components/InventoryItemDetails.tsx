@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 import { useState } from "react";
-import { CheckCircle, User } from "lucide-react";
+import { CheckCircle, User, ArrowLeft } from "lucide-react";
 import { useInventory, InventoryItem, Transaction } from "@/contexts/InventoryContext";
 
 interface InventoryItemDetailsProps {
@@ -39,6 +39,12 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
   // Modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  
+  // Validation state
+  const [validationErrors, setValidationErrors] = useState({
+    user: "",
+    quantity: ""
+  });
 
   const handleActionChange = (newAction: "Add" | "Remove") => {
     setAction(newAction);
@@ -47,13 +53,29 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (quantity <= 0) {
-      return; // Don't allow negative or zero quantities
-    }
+    // Reset validation errors
+    setValidationErrors({ user: "", quantity: "" });
+    
+    // Validate all required fields
+    let hasErrors = false;
+    const errors = {
+      user: "",
+      quantity: ""
+    };
     
     if (!user.trim()) {
-      alert("Please enter the user name for this transaction.");
-      return; // Don't allow empty user names
+      errors.user = "User name is required";
+      hasErrors = true;
+    }
+    
+    if (quantity <= 0) {
+      errors.quantity = "Quantity must be greater than 0";
+      hasErrors = true;
+    }
+    
+    if (hasErrors) {
+      setValidationErrors(errors);
+      return;
     }
     
     // Calculate the new quantity
@@ -100,16 +122,15 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Inventory Item Details</h1>
-          <p className="text-gray-500">Detailed information for {item.name}</p>
+          <p className="text-gray-600">Detailed information for {item.name}</p>
         </div>
-        <div className="flex gap-2">
-          <Link 
-            href="/dashboard/inventory" 
-            className="px-4 py-2 bg-white border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors flex items-center gap-2"
-          >
-            ← Back to Inventory
-          </Link>
-        </div>
+        <Link 
+          href="/dashboard/inventory" 
+          className="px-4 py-2 bg-white border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Inventory
+        </Link>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -197,34 +218,57 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
               <div className="space-y-2">
                 <label htmlFor="user" className="text-sm font-medium text-gray-700 flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Name *
+                  Name <span className="text-red-500">*</span>
                 </label>
                 <Input 
                   id="user" 
                   type="text" 
                   placeholder="Enter your name" 
                   value={user}
-                  onChange={(e) => setUser(e.target.value)}
-                  className="border-gray-300 focus:border-red-500 focus:ring-red-500"
+                  onChange={(e) => {
+                    setUser(e.target.value);
+                                         // Clear validation error when user starts typing
+                     if (validationErrors.user) {
+                       setValidationErrors({ user: "", quantity: validationErrors.quantity });
+                     }
+                  }}
+                  className={`border-gray-300 focus:border-red-500 focus:ring-red-500 ${
+                    validationErrors.user ? 'border-red-500' : ''
+                  }`}
                   required
                 />
+                {validationErrors.user && (
+                  <p className="text-sm text-red-600 mt-1">{validationErrors.user}</p>
+                )}
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="quantity" className="text-sm font-medium text-gray-700">Quantity ({item.unit})</label>
-                <Input 
-                  id="quantity" 
-                  type="number" 
-                  min="1" 
-                  value={quantity} 
-                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                  className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                />
-                {action === "Remove" && quantity > item.quantity && (
-                  <p className="text-sm text-red-600 mt-1">
-                    Cannot remove more than current quantity ({item.quantity} {item.unit})
-                  </p>
-                )}
+                             <div className="space-y-2">
+                 <label htmlFor="quantity" className="text-sm font-medium text-gray-700">Quantity ({item.unit}) <span className="text-red-500">*</span></label>
+                                 <Input 
+                   id="quantity" 
+                   type="number" 
+                   min="1" 
+                   value={quantity} 
+                   onChange={(e) => {
+                     const newQuantity = parseInt(e.target.value) || 1;
+                     setQuantity(newQuantity);
+                     // Clear validation error when user starts typing
+                     if (validationErrors.quantity) {
+                       setValidationErrors({ user: validationErrors.user, quantity: "" });
+                     }
+                   }}
+                   className={`border-gray-300 focus:border-red-500 focus:ring-red-500 ${
+                     validationErrors.quantity ? 'border-red-500' : ''
+                   }`}
+                                  />
+                 {validationErrors.quantity && (
+                   <p className="text-sm text-red-600 mt-1">{validationErrors.quantity}</p>
+                 )}
+                 {action === "Remove" && quantity > item.quantity && (
+                   <p className="text-sm text-red-600 mt-1">
+                     Cannot remove more than current quantity ({item.quantity} {item.unit})
+                   </p>
+                 )}
               </div>
 
               <div className="space-y-2">
@@ -238,13 +282,13 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
                 />
               </div>
 
-              <Button 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md" 
-                type="submit"
-                disabled={action === "Remove" && quantity > item.quantity || !user.trim()}
-              >
-                Update Inventory
-              </Button>
+                             <Button 
+                 className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md" 
+                 type="submit"
+                 disabled={action === "Remove" && quantity > item.quantity}
+               >
+                 Update Inventory
+               </Button>
             </form>
           </CardContent>
         </Card>

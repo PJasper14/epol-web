@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { Incident } from '@/app/dashboard/safeguarding/IncidentContext';
 
 // Function to generate and download PDF report of safeguarding incidents
-export const generateSafeguardingPDF = (incidents: Incident[]) => {
+export const generateSafeguardingPDF = async (incidents: Incident[]): Promise<boolean> => {
   try {
     // Create a new PDF document
     const doc = new jsPDF();
@@ -13,15 +13,14 @@ export const generateSafeguardingPDF = (incidents: Incident[]) => {
     const cabuyaoLogoPath = '/images/CABUYAO LOGO.jpg';
     const epolLogoPath = '/images/EPOL LOGO.jpg';
     
-    // Load both logos and generate PDF when ready
-    loadLogos(cabuyaoLogoPath, epolLogoPath)
-      .then(([cabuyaoLogo, epolLogo]) => {
-        generatePDFWithLogos(doc, pageWidth, cabuyaoLogo, epolLogo, incidents);
-      })
-      .catch((error) => {
-        console.error('Error loading logos:', error);
-        generatePDFWithoutLogos(doc, pageWidth, incidents);
-      });
+    try {
+      // Load both logos and generate PDF when ready
+      const [cabuyaoLogo, epolLogo] = await loadLogos(cabuyaoLogoPath, epolLogoPath);
+      generatePDFWithLogos(doc, pageWidth, cabuyaoLogo, epolLogo, incidents);
+    } catch (error) {
+      console.error('Error loading logos:', error);
+      generatePDFWithoutLogos(doc, pageWidth, incidents);
+    }
       
     return true;
   } catch (error) {
@@ -133,18 +132,27 @@ function generatePDFContent(doc: jsPDF, pageWidth: number, incidents: Incident[]
   
   const totalIncidents = incidents.length;
   const pendingIncidents = incidents.filter(incident => incident.status === 'Pending').length;
-  const inProgressIncidents = incidents.filter(incident => incident.status === 'In Progress').length;
+  const ongoingIncidents = incidents.filter(incident => incident.status === 'Ongoing').length;
   const resolvedIncidents = incidents.filter(incident => incident.status === 'Resolved').length;
+  
+  const lowPriority = incidents.filter(incident => (incident.priority || 'Low') === 'Low').length;
+  const mediumPriority = incidents.filter(incident => incident.priority === 'Medium').length;
+  const highPriority = incidents.filter(incident => incident.priority === 'High').length;
   
   doc.text(`Total Incidents: ${totalIncidents}`, 15, 10 + logoHeight + 40);
   doc.text(`Pending: ${pendingIncidents}`, 15, 10 + logoHeight + 48);
-  doc.text(`In Progress: ${inProgressIncidents}`, 15, 10 + logoHeight + 56);
+  doc.text(`Ongoing: ${ongoingIncidents}`, 15, 10 + logoHeight + 56);
   doc.text(`Resolved: ${resolvedIncidents}`, 15, 10 + logoHeight + 64);
+  
+  doc.text(`Low Priority: ${lowPriority}`, 15, 10 + logoHeight + 72);
+  doc.text(`Medium Priority: ${mediumPriority}`, 15, 10 + logoHeight + 80);
+  doc.text(`High Priority: ${highPriority}`, 15, 10 + logoHeight + 88);
   
   // Create the incident table data
   const tableData = incidents.map(incident => {
     // Format the status with an appropriate color (this will be used in the table)
     let status = incident.status;
+    let priority = incident.priority || 'Low';
     
     return [
       incident.id,
@@ -152,6 +160,7 @@ function generatePDFContent(doc: jsPDF, pageWidth: number, incidents: Incident[]
       incident.location,
       `${incident.date} ${incident.time}`,
       incident.reportedBy,
+      priority,
       status,
       incident.lastUpdated ? new Date(incident.lastUpdated).toLocaleDateString() : 'N/A'
     ];
@@ -159,9 +168,9 @@ function generatePDFContent(doc: jsPDF, pageWidth: number, incidents: Incident[]
   
   // Create the incident table
   autoTable(doc, {
-    head: [['ID', 'Incident', 'Location', 'Date & Time', 'Reported By', 'Status', 'Last Updated']],
+    head: [['ID', 'Incident', 'Location', 'Date & Time', 'Reported By', 'Priority', 'Status', 'Last Updated']],
     body: tableData,
-    startY: 10 + logoHeight + 75,
+    startY: 10 + logoHeight + 95,
     theme: 'grid',
     styles: { fontSize: 9 },
     headStyles: { fillColor: [220, 53, 69], textColor: [255, 255, 255] },
@@ -172,24 +181,37 @@ function generatePDFContent(doc: jsPDF, pageWidth: number, incidents: Incident[]
       2: { cellWidth: 'auto' }, // Location
       3: { cellWidth: 'auto' }, // Date & Time
       4: { cellWidth: 'auto' }, // Reporter
-      5: { cellWidth: 'auto', fontStyle: 'bold' }, // Status
-      6: { cellWidth: 'auto' }  // Last Updated
+      5: { cellWidth: 'auto', fontStyle: 'bold' }, // Priority
+      6: { cellWidth: 'auto', fontStyle: 'bold' }, // Status
+      7: { cellWidth: 'auto' }  // Last Updated
     },
     didDrawCell: (data) => {
-      // Color the status cell based on value
-      if (data.column.index === 5 && data.cell.section === 'body') {
-        const status = data.cell.raw as string;
+      // Color the priority and status cells based on value
+      if (data.cell.section === 'body') {
+        const cellValue = data.cell.raw as string;
         
         // Save current text color
         const currentColor = doc.getTextColor();
         
-        // Apply color based on status
-        if (status === 'Pending') {
-          doc.setTextColor(247, 144, 9); // Orange/yellow
-        } else if (status === 'In Progress') {
-          doc.setTextColor(59, 130, 246); // Blue
-        } else if (status === 'Resolved') {
-          doc.setTextColor(16, 185, 129); // Green
+        // Apply color based on priority (column 5)
+        if (data.column.index === 5) {
+          if (cellValue === 'Low') {
+            doc.setTextColor(16, 185, 129); // Green
+          } else if (cellValue === 'Medium') {
+            doc.setTextColor(247, 144, 9); // Orange/yellow
+          } else if (cellValue === 'High') {
+            doc.setTextColor(220, 53, 69); // Red
+          }
+        }
+        // Apply color based on status (column 6)
+        else if (data.column.index === 6) {
+          if (cellValue === 'Pending') {
+            doc.setTextColor(247, 144, 9); // Orange/yellow
+          } else if (cellValue === 'Ongoing') {
+            doc.setTextColor(59, 130, 246); // Blue
+          } else if (cellValue === 'Resolved') {
+            doc.setTextColor(16, 185, 129); // Green
+          }
         }
         
         // We've already modified the cell's appearance, restore color for next cells

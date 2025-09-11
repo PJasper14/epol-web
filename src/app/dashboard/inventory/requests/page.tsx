@@ -15,10 +15,13 @@ import {
   AlertTriangle,
   Eye,
   Download,
-  RefreshCw
+  X,
+  ArrowLeft,
+  Box
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Link from "next/link";
+
 import { generateInventoryRequestPDF } from "@/utils/pdfExport";
 
 interface InventoryRequest {
@@ -66,6 +69,10 @@ export default function InventoryRequestsPage() {
   const [adminNotes, setAdminNotes] = useState("");
   const [processing, setProcessing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // Mock data for demonstration
   useEffect(() => {
@@ -176,6 +183,87 @@ export default function InventoryRequestsPage() {
             }
           ],
           created_at: "2024-01-13T09:00:00Z"
+        },
+        {
+          id: "REQ-004",
+          user: {
+            id: "4",
+            name: "Ana Santos",
+            email: "ana.santos@epol.gov.ph"
+          },
+          reason: "Monthly restocking of cleaning supplies for office maintenance.",
+          request_date: "2024-01-12",
+          status: "pending",
+          items: [
+            {
+              id: "5",
+              inventory_item: {
+                id: "INV-008",
+                name: "Broom",
+                unit: "Pcs"
+              },
+              quantity: 50,
+              current_stock: 150,
+              threshold: 100
+            }
+          ],
+          created_at: "2024-01-12T11:30:00Z"
+        },
+        {
+          id: "REQ-005",
+          user: {
+            id: "5",
+            name: "Roberto Cruz",
+            email: "roberto.cruz@epol.gov.ph"
+          },
+          reason: "Safety equipment replacement for field operations team.",
+          request_date: "2024-01-11",
+          status: "approved",
+          admin_notes: "Approved. Safety equipment is priority.",
+          processed_by: {
+            id: "admin1",
+            name: "Admin User"
+          },
+          processed_at: "2024-01-11T15:45:00Z",
+          items: [
+            {
+              id: "6",
+              inventory_item: {
+                id: "INV-009",
+                name: "Safety Helmet",
+                unit: "Pcs"
+              },
+              quantity: 25,
+              current_stock: 75,
+              threshold: 50
+            }
+          ],
+          created_at: "2024-01-11T09:15:00Z"
+        },
+        {
+          id: "REQ-006",
+          user: {
+            id: "6",
+            name: "Luzviminda Reyes",
+            email: "luzviminda.reyes@epol.gov.ph"
+          },
+          reason: "Additional tools for new team members joining next week.",
+          request_date: "2024-01-10",
+          status: "pending",
+          items: [
+            {
+              id: "7",
+              inventory_item: {
+                id: "INV-010",
+                name: "Work Gloves",
+                unit: "Pairs"
+              },
+              quantity: 30,
+              current_stock: 200,
+              threshold: 150
+            }
+          ],
+          created_at: "2024-01-10T14:20:00Z"
         }
       ];
 
@@ -197,6 +285,17 @@ export default function InventoryRequestsPage() {
 
     return matchesSearch && matchesStatus;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentRequests = filteredRequests.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchQuery]);
 
   
 
@@ -276,51 +375,63 @@ export default function InventoryRequestsPage() {
   const approvedCount = requests.filter(r => r.status === 'approved').length;
   const rejectedCount = requests.filter(r => r.status === 'rejected').length;
 
+  // Check if any filters are active
+  const hasActiveFilters = statusFilter !== 'all';
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Inventory Requests</h1>
-        <p className="text-gray-600">Manage requests from team leaders</p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Inventory Requests</h1>
+          <p className="text-gray-600">Manage requests from team leaders</p>
+        </div>
+        <Link 
+          href="/dashboard/inventory" 
+          className="px-4 py-2 bg-white border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Inventory
+        </Link>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="border-yellow-200 bg-white shadow-md hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card className="border-l-4 border-l-yellow-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 font-medium">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
+                <p className="text-sm font-medium text-gray-600 mb-1">Pending Requests</p>
+                <p className="text-3xl font-bold text-gray-900">{pendingCount}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center shadow-sm">
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center shadow-md">
                 <Clock className="h-6 w-6 text-yellow-600" />
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="border-green-200 bg-white shadow-md hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+        <Card className="border-l-4 border-l-green-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 font-medium">Approved</p>
-                <p className="text-2xl font-bold text-green-600">{approvedCount}</p>
+                <p className="text-sm font-medium text-gray-600 mb-1">Approved Requests</p>
+                <p className="text-3xl font-bold text-gray-900">{approvedCount}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center shadow-sm">
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-md">
                 <CheckCircle className="h-6 w-6 text-green-600" />
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="border-red-200 bg-white shadow-md hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+        <Card className="border-l-4 border-l-red-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 font-medium">Rejected</p>
-                <p className="text-2xl font-bold text-red-600">{rejectedCount}</p>
+                <p className="text-sm font-medium text-gray-600 mb-1">Rejected Requests</p>
+                <p className="text-3xl font-bold text-gray-900">{rejectedCount}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center shadow-sm">
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center shadow-md">
                 <XCircle className="h-6 w-6 text-red-600" />
               </div>
             </div>
@@ -354,53 +465,39 @@ export default function InventoryRequestsPage() {
                 onClick={() => setShowFilters(!showFilters)}
               >
                 <Filter className={`h-5 w-5 ${showFilters ? "text-white" : "text-gray-600"}`} />
+                {hasActiveFilters && (
+                  <span className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm border border-red-200">
+                    {[statusFilter].filter(filter => filter !== 'all').length}
+                  </span>
+                )}
               </Button>
-              <Button 
-                variant="outline" 
-                className="gap-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
-                onClick={loadRequests}
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
-              </Button>
+
             </div>
 
             {showFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-1 gap-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
                 <div>
-                  <label className="text-sm font-semibold mb-3 text-gray-700">Status</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="border-gray-300 bg-white focus:border-red-500 focus:ring-red-500 hover:border-red-400 transition-colors">
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border border-gray-200 shadow-lg z-50 rounded-lg p-1">
-                      <SelectItem 
-                        value="all" 
-                        className="cursor-pointer rounded-md px-3 py-2 hover:bg-red-50 hover:text-red-700 data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700 data-[state=checked]:bg-red-100 data-[state=checked]:text-red-700 [&_svg]:hidden"
+                  <h3 className="text-sm font-semibold mb-3 text-gray-700">Status</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: "pending", label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+                      { value: "approved", label: "Approved", color: "bg-green-100 text-green-800 border-green-200" },
+                      { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-800 border-red-200" }
+                    ].map((status) => (
+                      <Button
+                        key={status.value}
+                        variant={statusFilter === status.value ? "default" : "outline"}
+                        size="sm"
+                        className={`${status.color} ${statusFilter === status.value ? "ring-2 ring-offset-2 ring-red-500 shadow-md" : "border-gray-300 hover:bg-gray-50"}`}
+                        onClick={() => setStatusFilter(statusFilter === status.value ? "all" : status.value)}
                       >
-                        All statuses
-                      </SelectItem>
-                      <SelectItem 
-                        value="pending"
-                        className="cursor-pointer rounded-md px-3 py-2 hover:bg-red-50 hover:text-red-700 data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700 data-[state=checked]:bg-red-100 data-[state=checked]:text-red-700 [&_svg]:hidden"
-                      >
-                        Pending
-                      </SelectItem>
-                      <SelectItem 
-                        value="approved"
-                        className="cursor-pointer rounded-md px-3 py-2 hover:bg-red-50 hover:text-red-700 data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700 data-[state=checked]:bg-red-100 data-[state=checked]:text-red-700 [&_svg]:hidden"
-                      >
-                        Approved
-                      </SelectItem>
-                      <SelectItem 
-                        value="rejected"
-                        className="cursor-pointer rounded-md px-3 py-2 hover:bg-red-50 hover:text-red-700 data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700 data-[state=checked]:bg-red-100 data-[state=checked]:text-red-700 [&_svg]:hidden"
-                      >
-                        Rejected
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                        {status.label}
+                        {statusFilter === status.value && (
+                          <X className="ml-1 h-3 w-3" />
+                        )}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -409,69 +506,89 @@ export default function InventoryRequestsPage() {
       </Card>
 
       {/* Requests Table */}
-      <Card className="bg-white shadow-md border-gray-200">
+      <Card className="border-l-4 border-l-red-500 bg-white shadow-lg">
         <CardHeader className="bg-gradient-to-r from-red-50 to-red-100 rounded-t-lg border-b border-red-200">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-red-600 flex items-center justify-center shadow-md">
+              <Box className="h-6 w-6 text-white" />
+            </div>
             <div>
-              <CardTitle className="text-xl font-semibold text-gray-900">Inventory Requests</CardTitle>
-              <CardDescription className="text-gray-600">Manage team leader requests</CardDescription>
+              <CardTitle className="text-xl text-gray-900">Inventory Requests</CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                {filteredRequests.length} requests • Manage team leader requests
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left py-4 px-4 font-semibold text-gray-700">Request ID</th>
-                  <th className="text-left py-4 px-4 font-semibold text-gray-700">Team Leader</th>
-                  <th className="text-left py-4 px-4 font-semibold text-gray-700">Status</th>
-                  <th className="text-left py-4 px-4 font-semibold text-gray-700">Items</th>
-                  <th className="text-left py-4 px-4 font-semibold text-gray-700">Request Date</th>
-                  <th className="text-left py-4 px-4 font-semibold text-gray-700">Actions</th>
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Request ID
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Team Leader
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Items
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Request Date
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
-              <tbody>
-                {filteredRequests.map((request) => (
-                  <tr key={request.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-4 px-4 font-medium text-gray-900">{request.id}</td>
-                    <td className="py-4 px-4">
-                      <div>
-                        <div className="font-medium text-gray-900">{request.user.name}</div>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {currentRequests.length > 0 ? currentRequests.map((request) => (
+                  <tr key={request.id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <td className="py-4 px-6">
+                      <div className="font-semibold text-gray-900">{request.id}</div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="font-semibold text-gray-900">{request.user.name}</div>
                         <div className="text-sm text-gray-500">{request.user.email}</div>
-                      </div>
                     </td>
-                    <td className="py-4 px-4">
-                      <Badge className={`${getStatusColor(request.status)} flex items-center gap-1`}>
-                        {getStatusIcon(request.status)}
+                    <td className="py-4 px-6">
+                      <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusColor(request.status)}`}>
                         {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                      </Badge>
+                      </span>
                     </td>
-                    <td className="py-4 px-4 text-gray-700">
+                    <td className="py-4 px-6">
+                      <span className="font-medium text-gray-900">
                       {request.items.length} item{request.items.length !== 1 ? 's' : ''}
+                      </span>
                     </td>
-                    <td className="py-4 px-4 text-gray-700">
+                    <td className="py-4 px-6">
+                      <span className="font-medium text-gray-900">
                       {new Date(request.request_date).toLocaleDateString()}
+                      </span>
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="flex gap-2">
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-2">
                         <Button
-                          variant="outline"
+                          variant="default"
                           size="sm"
-                          className="h-9 px-3 font-semibold border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400"
+                          className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
                           onClick={() => handleViewDetails(request)}
                         >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
+                          <Eye className="h-3.5 w-3.5 mr-1" />
+                          View Details
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-9 px-3 font-semibold border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                          className="h-8 px-3 bg-black text-white border-black hover:bg-gray-800 hover:border-gray-800 shadow-sm"
                           onClick={() => downloadRequest(request)}
                           disabled={downloading}
                         >
-                          <Download className="h-4 w-4 mr-1" />
+                          <Download className="h-3.5 w-3.5 mr-1" />
                           PDF
                         </Button>
                         {request.status === 'pending' && (
@@ -479,19 +596,19 @@ export default function InventoryRequestsPage() {
                             <Button
                               variant="default"
                               size="sm"
-                              className="h-9 px-3 font-semibold bg-green-600 hover:bg-green-700 text-white"
+                              className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white shadow-sm"
                               onClick={() => handleAction(request, 'approve')}
                             >
-                              <CheckCircle className="h-4 w-4 mr-1" />
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" />
                               Approve
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              className="h-9 px-3 font-semibold bg-red-600 hover:bg-red-700 text-white"
+                              className="h-8 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm"
                               onClick={() => handleAction(request, 'reject')}
                             >
-                              <XCircle className="h-4 w-4 mr-1" />
+                              <XCircle className="h-3.5 w-3.5 mr-1" />
                               Reject
                             </Button>
                           </>
@@ -499,13 +616,67 @@ export default function InventoryRequestsPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={6} className="py-12 px-6 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
+                          <Box className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-1">No requests found</h3>
+                          <p className="text-gray-500">Try adjusting your search criteria or filters</p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
-            <div className="text-sm text-gray-600 font-medium">
-              Showing {filteredRequests.length} of {requests.length} requests
+          <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600 font-medium">
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredRequests.length)} of {filteredRequests.length} requests
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 px-3 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.max(1, totalPages) }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      disabled={totalPages === 1}
+                      className={`h-8 w-8 p-0 ${
+                        currentPage === page 
+                          ? "bg-red-600 hover:bg-red-700 text-white shadow-md" 
+                          : "border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+                      }`}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 px-3 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>

@@ -134,14 +134,16 @@ function generatePDFContent(doc: jsPDF, pageWidth: number, inventoryItems: Inven
   doc.setFont('helvetica', 'normal');
   
   const totalItems = inventoryItems.length;
-  const totalQuantity = inventoryItems.reduce((sum, item) => sum + item.quantity, 0);
+  const inStockItems = inventoryItems.filter(item => 
+    item.quantity >= item.threshold
+  ).length;
   const lowStockItems = inventoryItems.filter(item => 
     item.quantity > 0 && item.quantity < item.threshold
   ).length;
   const outOfStockItems = inventoryItems.filter(item => item.quantity === 0).length;
   
   doc.text(`Total Items: ${totalItems}`, 15, 10 + logoHeight + 40);
-  doc.text(`Total Quantity: ${totalQuantity}`, 15, 10 + logoHeight + 48);
+  doc.text(`In Stock Items: ${inStockItems}`, 15, 10 + logoHeight + 48);
   doc.text(`Low Stock Items: ${lowStockItems}`, 15, 10 + logoHeight + 56);
   doc.text(`Out of Stock Items: ${outOfStockItems}`, 15, 10 + logoHeight + 64);
   

@@ -7,6 +7,15 @@ import { AlertCircle, Clock, User, FileText, Calendar, AlertTriangle, CheckCircl
 import Link from "next/link";
 import { useIncidentContext } from "../IncidentContext";
 
+// Helper function to convert 24-hour time to 12-hour format
+const formatTimeTo12Hour = (time24: string) => {
+  const [hours, minutes] = time24.split(':');
+  const hour = parseInt(hours, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+};
+
 export default function IncidentDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { incidents, updateIncident } = useIncidentContext();
   const { id } = React.use(params);
@@ -58,7 +67,7 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
 
   const handleMarkInProgress = () => {
     updateIncident(incidentReport.id, {
-      status: "In Progress",
+      status: "Ongoing",
       lastUpdated: new Date().toISOString()
     });
     setShowInProgressConfirm(false);
@@ -68,10 +77,23 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
     switch (status) {
       case "Pending":
         return "bg-yellow-100 text-yellow-800";
-      case "In Progress":
+      case "Ongoing":
         return "bg-blue-100 text-blue-800";
       case "Resolved":
         return "bg-green-100 text-green-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "Low":
+        return "bg-green-100 text-green-800";
+      case "Medium":
+        return "bg-yellow-100 text-yellow-800";
+      case "High":
+        return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -87,10 +109,10 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
         return (
           <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowInProgressConfirm(true)}>
             <Clock className="h-4 w-4" />
-            Mark as In Progress
+            Mark as Ongoing
           </Button>
         );
-      case "In Progress":
+      case "Ongoing":
         return (
           <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => setShowConfirm(true)}>
             <CheckCircle className="h-4 w-4" />
@@ -134,13 +156,13 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
                     <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-xs border border-gray-200">
                       <div className="mb-4 text-center">
                         <Clock className="mx-auto mb-2 h-8 w-8 text-blue-600" />
-                        <div className="font-semibold mb-2">Mark as In Progress?</div>
+                        <div className="font-semibold mb-2">Mark as Ongoing?</div>
                         <div className="text-gray-500 text-sm">Are you sure you want to mark this incident as in progress?</div>
                       </div>
                       <div className="flex gap-2 justify-center">
                         <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white flex items-center" onClick={handleMarkInProgress}>
                           <Clock className="h-4 w-4 mr-1 text-white" />
-                          Yes, Mark as In Progress
+                          Yes, Mark as Ongoing
                     </Button>
                         <Button size="sm" className="border border-gray-300 text-gray-700 hover:bg-gray-100" variant="outline" onClick={() => setShowInProgressConfirm(false)}>Cancel</Button>
                       </div>
@@ -181,7 +203,7 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
                   <Calendar className="h-4 w-4" />
                   <span>Date & Time</span>
                 </div>
-                <p className="font-medium">{incidentReport.date} at {incidentReport.time}</p>
+                <p className="font-medium">{incidentReport.date} at {formatTimeTo12Hour(incidentReport.time)}</p>
               </div>
               <div>
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
@@ -215,6 +237,14 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
                     <span className="text-xs text-gray-400">No media uploaded</span>
                   </div>
                 </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                  <span>Priority</span>
+                </div>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getPriorityColor(incidentReport.priority || "Low")}`}>
+                  {incidentReport.priority || "Low"}
+                </span>
               </div>
               <div>
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">

@@ -40,7 +40,7 @@ const initialIncidents: Incident[] = [
     date: "2023-04-18",
     time: "10:15",
     reportedBy: "Jane Smith",
-    status: "In Progress",
+    status: "Ongoing",
     priority: "Medium",
     description: "Excessive smoke emissions observed from factory chimney. Residents complained about strong odor.",
     lastUpdated: "2023-04-18T16:45:00",
@@ -74,7 +74,7 @@ const initialIncidents: Incident[] = [
     time: "16:20",
     reportedBy: "Sam Williams",
     status: "Pending",
-    priority: "Critical",
+    priority: "High",
     description: "Tanker truck accident resulting in chemical spill. Emergency response team dispatched."
   },
   {
@@ -84,9 +84,92 @@ const initialIncidents: Incident[] = [
     date: "2023-04-14",
     time: "09:30",
     reportedBy: "Taylor Brown",
-    status: "In Progress",
+    status: "Ongoing",
     priority: "Medium",
     description: "Multiple individuals observed using prohibited fishing methods in protected waters."
+  },
+  {
+    id: "INC-2023-006",
+    title: "Deforestation Activity",
+    location: "Mountain Ridge Forest",
+    date: "2023-04-13",
+    time: "11:45",
+    reportedBy: "Maria Garcia",
+    status: "Pending",
+    priority: "High",
+    description: "Unauthorized tree cutting detected in protected forest area. Heavy machinery tracks found.",
+    lastUpdated: "2023-04-13T12:15:00",
+    actions: [
+      { date: "2023-04-13T12:00:00", action: "Report received and logged", by: "System" },
+      { date: "2023-04-13T12:15:00", action: "Field investigation initiated", by: "System" }
+    ]
+  },
+  {
+    id: "INC-2023-007",
+    title: "Water Contamination",
+    location: "Village Water Source",
+    date: "2023-04-12",
+    time: "08:20",
+    reportedBy: "David Chen",
+    status: "Ongoing",
+    priority: "High",
+    description: "Residents reporting unusual taste and color in drinking water. Health concerns raised.",
+    lastUpdated: "2023-04-12T14:30:00",
+    actions: [
+      { date: "2023-04-12T08:35:00", action: "Report received and logged", by: "System" },
+      { date: "2023-04-12T09:00:00", action: "Water samples collected for testing", by: "System" },
+      { date: "2023-04-12T14:30:00", action: "Preliminary test results show contamination", by: "System" }
+    ]
+  },
+  {
+    id: "INC-2023-008",
+    title: "Noise Pollution",
+    location: "Residential District A",
+    date: "2023-04-11",
+    time: "22:15",
+    reportedBy: "Lisa Anderson",
+    status: "Resolved",
+    priority: "Low",
+    description: "Excessive noise from construction work during prohibited hours. Multiple complaints received.",
+    lastUpdated: "2023-04-11T23:45:00",
+    actions: [
+      { date: "2023-04-11T22:30:00", action: "Report received and logged", by: "System" },
+      { date: "2023-04-11T22:45:00", action: "Site inspection conducted", by: "System" },
+      { date: "2023-04-11T23:45:00", action: "Construction work stopped, case resolved", by: "System" }
+    ]
+  },
+  {
+    id: "INC-2023-009",
+    title: "Soil Erosion",
+    location: "Hillside Development Site",
+    date: "2023-04-10",
+    time: "13:10",
+    reportedBy: "Robert Kim",
+    status: "Ongoing",
+    priority: "Medium",
+    description: "Significant soil erosion observed due to improper land development practices. Risk of landslide.",
+    lastUpdated: "2023-04-10T16:20:00",
+    actions: [
+      { date: "2023-04-10T13:25:00", action: "Report received and logged", by: "System" },
+      { date: "2023-04-10T14:00:00", action: "Geological assessment initiated", by: "System" },
+      { date: "2023-04-10T16:20:00", action: "Emergency stabilization measures recommended", by: "System" }
+    ]
+  },
+  {
+    id: "INC-2023-010",
+    title: "Wildlife Habitat Destruction",
+    location: "Wetland Conservation Area",
+    date: "2023-04-09",
+    time: "15:30",
+    reportedBy: "Sarah Wilson",
+    status: "Pending",
+    priority: "High",
+    description: "Construction activities encroaching on protected wetland area. Endangered species habitat at risk.",
+    lastUpdated: "2023-04-09T16:00:00",
+    actions: [
+      { date: "2023-04-09T15:45:00", action: "Report received and logged", by: "System" },
+      { date: "2023-04-09T16:00:00", action: "Environmental impact assessment ordered", by: "System" }
+    ]
   }
 ];
 
@@ -94,6 +177,7 @@ export type IncidentContextType = {
   incidents: Incident[];
   setIncidents: React.Dispatch<React.SetStateAction<Incident[]>>;
   updateIncident: (id: string, updates: Partial<Incident>) => void;
+  deleteIncident: (id: string) => void;
 };
 
 const IncidentContext = createContext<IncidentContextType | undefined>(undefined);
@@ -115,8 +199,12 @@ export function IncidentProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const deleteIncident = (id: string) => {
+    setIncidents((prev) => prev.filter((incident) => incident.id !== id));
+  };
+
   return (
-    <IncidentContext.Provider value={{ incidents, setIncidents, updateIncident }}>
+    <IncidentContext.Provider value={{ incidents, setIncidents, updateIncident, deleteIncident }}>
       {children}
     </IncidentContext.Provider>
   );

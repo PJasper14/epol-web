@@ -306,58 +306,58 @@ export default function EmployeeManagementPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="border-blue-200 bg-white shadow-md hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card className="border-l-4 border-l-blue-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 font-medium">Total Employees</p>
-                <p className="text-2xl font-bold text-gray-900">{employeeSummary.totalEmployees}</p>
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 font-medium mb-1">Total Employees</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.totalEmployees}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center shadow-sm">
-                <Users className="h-6 w-6 text-blue-600" />
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md">
+                <Users className="h-7 w-7 text-blue-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-green-200 bg-white shadow-md hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+        <Card className="border-l-4 border-l-green-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 font-medium">Active Employees</p>
-                <p className="text-2xl font-bold text-gray-900">{employeeSummary.activeEmployees}</p>
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 font-medium mb-1">Active Employees</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.activeEmployees}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center shadow-sm">
-                <UserPlus className="h-6 w-6 text-green-600" />
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-md">
+                <UserPlus className="h-7 w-7 text-green-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-yellow-200 bg-white shadow-md hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+        <Card className="border-l-4 border-l-yellow-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 font-medium">On Leave</p>
-                <p className="text-2xl font-bold text-gray-900">{employeeSummary.onLeaveEmployees}</p>
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 font-medium mb-1">On Leave</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.onLeaveEmployees}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center shadow-sm">
-                <Calendar className="h-6 w-6 text-yellow-600" />
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center shadow-md">
+                <Calendar className="h-7 w-7 text-yellow-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-purple-200 bg-white shadow-md hover:shadow-lg transition-shadow">
-          <CardContent className="p-4">
+        <Card className="border-l-4 border-l-purple-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 font-medium">Assigned</p>
-                <p className="text-2xl font-bold text-gray-900">{employeeSummary.assignedEmployees}</p>
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 font-medium mb-1">Assigned</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.assignedEmployees}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center shadow-sm">
-                <MapPin className="h-6 w-6 text-purple-600" />
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md">
+                <MapPin className="h-7 w-7 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -500,98 +500,135 @@ export default function EmployeeManagementPage() {
       </Card>
 
       {/* Employees Table */}
-      <Card className="bg-white shadow-md border-gray-200">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-lg border-b border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-xl font-semibold text-gray-900">EPOL Employees</CardTitle>
-              <CardDescription className="text-gray-600">Manage employee assignments and deployments</CardDescription>
+      <Card className="border-l-4 border-l-red-500 bg-white shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-red-50 to-red-100 rounded-t-lg border-b border-red-200">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-red-600 flex items-center justify-center shadow-md">
+              <Users className="h-6 w-6 text-white" />
             </div>
-            <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center shadow-sm">
-              <Users className="h-6 w-6 text-blue-600" />
+            <div>
+              <CardTitle className="text-xl text-gray-900">EPOL Employees</CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                {filteredEmployees.length} employees • Manage employee assignments and deployments
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead className="font-semibold text-gray-700">Employee ID</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Name</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Position</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Contact</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Current Assignment</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEmployees.map((employee) => (
-                  <TableRow key={employee.id} className="hover:bg-gray-50 transition-colors">
-                    <TableCell className="font-medium text-gray-900">{employee.id}</TableCell>
-                    <TableCell className="font-medium text-gray-900">{employee.name}</TableCell>
-                    <TableCell className="text-gray-700">{employee.position}</TableCell>
-                    <TableCell className="text-gray-700">{employee.contactNumber}</TableCell>
-                    <TableCell>
-                      <Badge className={`px-3 py-1 text-sm font-medium border ${getStatusColor(employee.status)}`}>
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Employee ID
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Position
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Contact
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Current Assignment
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredEmployees.length > 0 ? filteredEmployees.map((employee) => (
+                  <tr key={employee.id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <td className="py-4 px-6">
+                      <div className="font-semibold text-gray-900">{employee.id}</div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="font-semibold text-gray-900">{employee.name}</div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className="font-medium text-gray-900">{employee.position}</span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className="font-medium text-gray-900">{employee.contactNumber}</span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusColor(employee.status)}`}
+                      >
                         {employee.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-gray-700">
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
                       {employee.currentAssignment ? (
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-gray-500" />
-                            <span className="text-sm">{employee.currentAssignment.location}</span>
-                          </div>
-                          <Badge className={`px-2 py-0.5 text-xs font-medium border ${
+                          <div className="text-sm font-medium text-gray-900">{employee.currentAssignment.location}</div>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                             employee.currentAssignment.status === 'Active' 
-                              ? "bg-green-100 text-green-800 border-green-200" 
-                              : "bg-gray-100 text-gray-800 border-gray-200"
+                              ? "bg-green-100 text-green-800" 
+                              : "bg-gray-100 text-gray-800"
                           }`}>
                             {employee.currentAssignment.status}
-                          </Badge>
+                          </span>
                         </div>
                       ) : (
                         <span className="text-gray-500 text-sm">No assignment</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-2">
                         {!employee.currentAssignment || employee.currentAssignment.status !== 'Active' ? (
                           <Button
                             variant="default"
                             size="sm"
-                            className="h-8 px-3 font-semibold bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                            className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white shadow-sm"
                             onClick={() => {
                               setSelectedEmployee(employee);
                               setShowAssignmentModal(true);
                             }}
                           >
-                            <MapPin className="h-3 w-3 mr-1" />
+                            <MapPin className="h-3.5 w-3.5 mr-1" />
                             Assign
                           </Button>
                         ) : (
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 px-3 font-semibold border-blue-300 text-blue-700 hover:bg-blue-50 shadow-sm"
+                            className="h-8 px-3 border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 shadow-sm"
                             onClick={() => {
                               setSelectedEmployee(employee);
                               setShowReassignmentModal(true);
                             }}
                           >
-                            <Edit className="h-3 w-3 mr-1" />
+                            <Edit className="h-3.5 w-3.5 mr-1" />
                             Reassign
                           </Button>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={7} className="py-12 px-6 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
+                          <Users className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-1">No employees found</h3>
+                          <p className="text-gray-500">Try adjusting your search criteria or filters</p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>

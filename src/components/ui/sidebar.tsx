@@ -15,6 +15,7 @@ import {
   Home,
   Users,
   MapPin,
+  UserCog,
   LucideIcon
 } from 'lucide-react';
 
@@ -30,7 +31,7 @@ export function Sidebar() {
 
   const links: SidebarLink[] = [
     {
-      title: 'Dashboard',
+      title: 'Home',
       href: '/dashboard',
       icon: Home,
       variant: pathname === '/dashboard' ? 'default' : 'ghost',
@@ -42,22 +43,28 @@ export function Sidebar() {
       variant: pathname?.includes('/dashboard/attendance') ? 'default' : 'ghost',
     },
     {
-      title: 'Safeguarding Records',
-      href: '/dashboard/safeguarding',
-      icon: ShieldAlert,
-      variant: pathname?.includes('/dashboard/safeguarding') ? 'default' : 'ghost',
+      title: 'Employee Management',
+      href: '/dashboard/employees',
+      icon: Users,
+      variant: pathname?.includes('/dashboard/employees') ? 'default' : 'ghost',
     },
     {
-      title: 'Resources Inventory',
+      title: 'Account Management',
+      href: '/dashboard/accounts',
+      icon: UserCog,
+      variant: pathname?.includes('/dashboard/accounts') ? 'default' : 'ghost',
+    },
+    {
+      title: 'Inventory Management',
       href: '/dashboard/inventory',
       icon: Boxes,
       variant: pathname?.includes('/dashboard/inventory') ? 'default' : 'ghost',
     },
     {
-      title: 'Employee Management',
-      href: '/dashboard/employees',
-      icon: Users,
-      variant: pathname?.includes('/dashboard/employees') ? 'default' : 'ghost',
+      title: 'Safeguarding Records',
+      href: '/dashboard/safeguarding',
+      icon: ShieldAlert,
+      variant: pathname?.includes('/dashboard/safeguarding') ? 'default' : 'ghost',
     },
   ];
 
