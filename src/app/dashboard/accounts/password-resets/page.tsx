@@ -31,7 +31,16 @@ import { usePasswordReset, PasswordResetRequest } from '@/contexts/PasswordReset
 
 
 export default function PasswordResetRequestsPage() {
-  const { requests, updateRequest, deleteRequest: removeRequest } = usePasswordReset();
+  const { 
+    requests, 
+    loading, 
+    error, 
+    updateRequest, 
+    deleteRequest: removeRequest, 
+    approveRequest, 
+    rejectRequest,
+    refreshRequests 
+  } = usePasswordReset();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedRequest, setSelectedRequest] = useState<PasswordResetRequest | null>(null);
@@ -46,8 +55,8 @@ export default function PasswordResetRequestsPage() {
   const itemsPerPage = 10;
 
   const filteredRequests = requests.filter(request => {
-    const matchesSearch = request.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         request.userEmail.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = request.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         request.user_email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || request.status === filterStatus;
     
     return matchesSearch && matchesStatus;
@@ -56,20 +65,20 @@ export default function PasswordResetRequestsPage() {
     
     switch (sortBy) {
       case 'userName':
-        aValue = a.userName.toLowerCase();
-        bValue = b.userName.toLowerCase();
+        aValue = a.user_name.toLowerCase();
+        bValue = b.user_name.toLowerCase();
         break;
       case 'requestedAt':
-        aValue = new Date(a.requestedAt).getTime();
-        bValue = new Date(b.requestedAt).getTime();
+        aValue = new Date(a.requested_at).getTime();
+        bValue = new Date(b.requested_at).getTime();
         break;
       case 'status':
         aValue = a.status;
         bValue = b.status;
         break;
       default:
-        aValue = new Date(a.requestedAt).getTime();
-        bValue = new Date(b.requestedAt).getTime();
+        aValue = new Date(a.requested_at).getTime();
+        bValue = new Date(b.requested_at).getTime();
     }
     
     if (sortOrder === 'asc') {
@@ -93,38 +102,54 @@ export default function PasswordResetRequestsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
-      case 'Approved': return 'bg-green-100 text-green-800';
-      case 'Rejected': return 'bg-red-100 text-red-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Pending': return <Clock className="h-4 w-4" />;
-      case 'Approved': return <CheckCircle className="h-4 w-4" />;
-      case 'Rejected': return <XCircle className="h-4 w-4" />;
+      case 'pending': return <Clock className="h-4 w-4" />;
+      case 'approved': return <CheckCircle className="h-4 w-4" />;
+      case 'rejected': return <XCircle className="h-4 w-4" />;
       default: return <AlertCircle className="h-4 w-4" />;
     }
   };
 
-  const handleApprove = (requestId: string) => {
-    updateRequest(requestId, {
-      status: 'Approved',
-      adminNotes: adminNotes || 'Request approved by administrator'
-    });
-    setAdminNotes('');
-    setSelectedRequest(null);
+  const handleApprove = async (requestId: string) => {
+    try {
+      // Generate a new password for the user
+      const newPassword = generateNewPassword();
+      await approveRequest(requestId, newPassword, adminNotes || 'Request approved by administrator');
+      setSelectedRequest(null);
+      setAdminNotes('');
+    } catch (error) {
+      console.error('Error approving request:', error);
+      // Handle error (show notification, etc.)
+    }
   };
 
-  const handleReject = (requestId: string) => {
-    updateRequest(requestId, {
-      status: 'Rejected',
-      adminNotes: adminNotes || 'Request rejected by administrator'
-    });
-    setAdminNotes('');
-    setSelectedRequest(null);
+  const handleReject = async (requestId: string) => {
+    try {
+      await rejectRequest(requestId, adminNotes || 'Request rejected by administrator');
+      setSelectedRequest(null);
+      setAdminNotes('');
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      // Handle error (show notification, etc.)
+    }
+  };
+
+  const generateNewPassword = () => {
+    // Generate a secure random password
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
   };
 
   const handleDelete = (requestId: string) => {
@@ -153,7 +178,7 @@ export default function PasswordResetRequestsPage() {
             </div>
             <div className="flex items-center gap-3">
               <Link href="/dashboard/accounts">
-                <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400 transition-all duration-200 shadow-sm hover:shadow-md">
+                <Button className="bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Accounts
               </Button>
@@ -184,7 +209,7 @@ export default function PasswordResetRequestsPage() {
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 font-medium mb-1">Pending Requests</p>
                   <p className="text-3xl font-bold text-gray-900 mb-2">
-                    {requests.filter(r => r.status === 'Pending').length}
+                    {requests.filter(r => r.status === 'pending').length}
                   </p>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center shadow-md">
@@ -200,7 +225,7 @@ export default function PasswordResetRequestsPage() {
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 font-medium mb-1">Approved Requests</p>
                   <p className="text-3xl font-bold text-gray-900 mb-2">
-                    {requests.filter(r => r.status === 'Approved').length}
+                    {requests.filter(r => r.status === 'approved').length}
                   </p>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-md">
@@ -216,7 +241,7 @@ export default function PasswordResetRequestsPage() {
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 font-medium mb-1">Rejected Requests</p>
                   <p className="text-3xl font-bold text-gray-900 mb-2">
-                    {requests.filter(r => r.status === 'Rejected').length}
+                    {requests.filter(r => r.status === 'rejected').length}
                   </p>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center shadow-md">
@@ -254,7 +279,7 @@ export default function PasswordResetRequestsPage() {
                 >
                   <Filter className={`h-5 w-5 ${showFilters ? "text-white" : "text-gray-600"}`} />
                   {filterStatus !== 'all' && (
-                    <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm">
+                    <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
                       1
                     </span>
                   )}
@@ -266,19 +291,19 @@ export default function PasswordResetRequestsPage() {
                   <div>
                     <h3 className="text-sm font-semibold mb-3 text-gray-700">Status</h3>
                     <div className="flex flex-wrap gap-2">
-                      {['Pending', 'Approved', 'Rejected'].map((status) => (
+                      {['pending', 'approved', 'rejected'].map((status) => (
                   <Button
                           key={status}
                           variant={filterStatus === status ? "default" : "outline"}
                     size="sm"
                           className={`${
-                            status === 'Pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                            status === 'Approved' ? 'bg-green-100 text-green-800 border-green-200' :
+                            status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                            status === 'approved' ? 'bg-green-100 text-green-800 border-green-200' :
                             'bg-red-100 text-red-800 border-red-200'
                           } ${filterStatus === status ? "ring-2 ring-offset-2 ring-red-500 border-red-500 shadow-md" : "border-gray-300 hover:bg-gray-50"}`}
                           onClick={() => setFilterStatus(filterStatus === status ? 'all' : status)}
                         >
-                          {status}
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
                           {filterStatus === status && <X className="ml-1 h-3 w-3" />}
                   </Button>
                       ))}
@@ -340,27 +365,18 @@ export default function PasswordResetRequestsPage() {
                   currentRequests.map((request) => (
                     <tr key={request.id} className="hover:bg-gray-50/50 transition-colors duration-150 group">
                       <td className="py-4 px-6">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center mr-3">
-                            <span className="text-sm font-medium text-gray-600">
-                              {request.userName.split(' ').map(n => n[0]).join('')}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-900 group-hover:text-gray-700">{request.userName}</div>
-                          </div>
-                        </div>
+                        <div className="font-semibold text-gray-900 group-hover:text-gray-700">{request.user_name}</div>
                       </td>
                       <td className="py-4 px-6 text-sm text-gray-600">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-gray-400" />
-                          {new Date(request.requestedAt).toLocaleString()}
+                          {new Date(request.requested_at).toLocaleString()}
                         </div>
                       </td>
                       <td className="py-4 px-6">
                         <Badge className={`${getStatusColor(request.status)} flex items-center gap-1 w-fit px-3 py-1`}>
                           {getStatusIcon(request.status)}
-                          {request.status}
+                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                         </Badge>
                       </td>
                       <td className="py-4 px-6">
@@ -477,7 +493,7 @@ export default function PasswordResetRequestsPage() {
                       <User className="h-4 w-4" />
                       User Name
                     </Label>
-                      <p className="text-base text-slate-600">{selectedRequest.userName}</p>
+                      <p className="text-base text-slate-600">{selectedRequest.user_name}</p>
                 </div>
                 
                 <div className="space-y-2">
@@ -485,7 +501,7 @@ export default function PasswordResetRequestsPage() {
                     <Calendar className="h-4 w-4" />
                     Requested At
                   </Label>
-                      <p className="text-base text-slate-600">{new Date(selectedRequest.requestedAt).toLocaleString()}</p>
+                      <p className="text-base text-slate-600">{new Date(selectedRequest.requested_at).toLocaleString()}</p>
                 </div>
                 
                 <div className="space-y-2">
@@ -495,7 +511,7 @@ export default function PasswordResetRequestsPage() {
                   </Label>
                       <Badge className={`${getStatusColor(selectedRequest.status)} flex items-center gap-2 w-fit px-3 py-1 text-sm`}>
                     {getStatusIcon(selectedRequest.status)}
-                    {selectedRequest.status}
+                    {selectedRequest.status.charAt(0).toUpperCase() + selectedRequest.status.slice(1)}
                   </Badge>
                     </div>
                   </div>
@@ -506,7 +522,7 @@ export default function PasswordResetRequestsPage() {
                         <Mail className="h-4 w-4" />
                         Email
                       </Label>
-                      <p className="text-base text-slate-600">{selectedRequest.userEmail}</p>
+                      <p className="text-base text-slate-600">{selectedRequest.user_email}</p>
                     </div>
                     
                     <div className="space-y-2">
@@ -514,7 +530,7 @@ export default function PasswordResetRequestsPage() {
                         <Phone className="h-4 w-4" />
                         Contact Number
                       </Label>
-                      <p className="text-base text-slate-600">{selectedRequest.userPhone}</p>
+                      <p className="text-base text-slate-600">{selectedRequest.user_phone}</p>
                     </div>
                   </div>
                 </div>
@@ -526,16 +542,16 @@ export default function PasswordResetRequestsPage() {
                   </div>
                 </div>
                 
-                {selectedRequest.adminNotes && (
+                {selectedRequest.admin_notes && (
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-600">Admin Notes</Label>
                     <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
-                      <p className="text-gray-900 text-sm">{selectedRequest.adminNotes}</p>
+                      <p className="text-gray-900 text-sm">{selectedRequest.admin_notes}</p>
                     </div>
                   </div>
                 )}
                 
-                {selectedRequest.status === 'Pending' && (
+                {selectedRequest.status === 'pending' && (
                   <div className="space-y-4 pt-6 border-t border-gray-200">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-gray-600">Admin Notes (Optional)</Label>

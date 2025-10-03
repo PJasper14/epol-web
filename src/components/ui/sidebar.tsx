@@ -1,10 +1,11 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useAdmin } from '@/contexts/AdminContext';
 import { 
   BarChart3, 
   UserCheck, 
@@ -16,7 +17,9 @@ import {
   Users,
   MapPin,
   UserCog,
-  LucideIcon
+  Navigation,
+  LucideIcon,
+  AlertTriangle
 } from 'lucide-react';
 
 type SidebarLink = {
@@ -28,6 +31,19 @@ type SidebarLink = {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAdmin();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
+  };
+
+  const confirmLogout = async () => {
+    setShowLogoutModal(false);
+    await handleLogout();
+  };
 
   const links: SidebarLink[] = [
     {
@@ -115,14 +131,59 @@ export function Sidebar() {
         </nav>
       </div>
       <div className="mt-auto p-4 border-t border-red-500">
-        <Link
-          href="/"
-          className="group flex items-center justify-center gap-3 rounded-2xl bg-red-700 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-red-800"
+        <button
+          onClick={() => setShowLogoutModal(true)}
+          className="group flex items-center justify-center gap-3 rounded-2xl bg-red-700 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-red-800 w-full"
         >
           <LogOut className="h-5 w-5 text-white transition-colors" />
           <span className="transition-colors">Logout</span>
-        </Link>
+        </button>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white rounded-lg shadow-xl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="flex items-center gap-3 text-lg font-semibold text-gray-900">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                  Confirm Logout
+                </h3>
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  Are you sure you want to logout from the EPOL Admin Panel? You will need to login again to access the system.
+                </p>
+              </div>
+              
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmLogout}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

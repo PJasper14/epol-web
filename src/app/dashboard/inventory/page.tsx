@@ -1,7 +1,7 @@
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Box, Download, Filter, PlusCircle, Search, Boxes, X, ShoppingCart, Trash2, Plus, CheckCircle, Eye } from "lucide-react";
+import { Box, Download, Filter, PlusCircle, Search, Boxes, X, ShoppingCart, Trash2, Plus, CheckCircle, Eye, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
@@ -27,7 +27,7 @@ export default function InventoryPage() {
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
   
   // Form state for adding new item
   const [newItem, setNewItem] = useState({
@@ -46,7 +46,13 @@ export default function InventoryPage() {
   });
   
   // Use the inventory context
-  const { inventoryItems: contextItems, addInventoryItem, deleteInventoryItem } = useInventory();
+  const { 
+    inventoryItems: contextItems, 
+    loading, 
+    error, 
+    addInventoryItem, 
+    deleteInventoryItem 
+  } = useInventory();
 
   // Check if any filters are active (but don't include search)
   const hasActiveFilters = selectedStatus !== null;
@@ -112,7 +118,7 @@ export default function InventoryPage() {
   };
 
   // Handle adding new item
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     // Reset validation errors
     setValidationErrors({
       name: "",
@@ -155,17 +161,22 @@ export default function InventoryPage() {
       return;
     }
     
-    // If validation passes, add the item
-    addInventoryItem(newItem);
-    
-    // Show success message
-    setSuccessMessage(`${newItem.name} has been successfully added to inventory with ${newItem.quantity} ${newItem.unit}`);
-    setShowSuccessModal(true);
-    
-    // Reset form and close modal
-    setNewItem({ name: "", quantity: 0, unit: "", threshold: 0 });
-    setShowAddModal(false);
-    setValidationErrors({ name: "", unit: "", quantity: "", threshold: "" });
+    try {
+      // If validation passes, add the item
+      await addInventoryItem(newItem);
+      
+      // Show success message
+      setSuccessMessage(`${newItem.name} has been successfully added to inventory with ${newItem.quantity} ${newItem.unit}`);
+      setShowSuccessModal(true);
+      
+      // Reset form and close modal
+      setNewItem({ name: "", quantity: 0, unit: "", threshold: 0 });
+      setShowAddModal(false);
+      setValidationErrors({ name: "", unit: "", quantity: "", threshold: "" });
+    } catch (error) {
+      console.error('Error adding inventory item:', error);
+      // Error is already handled by the context
+    }
   };
 
   // Handle delete item
@@ -175,19 +186,34 @@ export default function InventoryPage() {
   };
 
   // Confirm delete
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (itemToDelete) {
-      deleteInventoryItem(itemToDelete);
-      setItemToDelete(null);
-      setShowDeleteModal(false);
+      try {
+        await deleteInventoryItem(itemToDelete);
+        setItemToDelete(null);
+        setShowDeleteModal(false);
+      } catch (error) {
+        console.error('Error deleting inventory item:', error);
+        // Error is already handled by the context
+      }
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Inventory Management</h1>
-        <p className="text-gray-600">Manage equipment and supplies</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Inventory Management</h1>
+            <p className="text-gray-600">Manage equipment and supplies</p>
+          </div>
+          <Link href="/dashboard">
+            <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -274,7 +300,7 @@ export default function InventoryPage() {
               >
                 <Filter className={`h-5 w-5 ${showFilters ? "text-white" : "text-gray-600"}`} />
                 {hasActiveFilters && (
-                  <span className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm border border-red-200">
+                  <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
                     {[selectedStatus].filter(Boolean).length}
                   </span>
                 )}
@@ -507,7 +533,19 @@ export default function InventoryPage() {
                         key={status}
                         variant={selectedStatus === status ? "default" : "outline"}
                         size="sm"
-                        className={`${getStatusColor(status)} ${selectedStatus === status ? "ring-2 ring-offset-2 ring-red-500 shadow-md" : "border-gray-300 hover:bg-gray-50"}`}
+                        className={`${
+                          status === "In Stock" 
+                            ? selectedStatus === status 
+                              ? "bg-green-600 text-white hover:bg-green-700 ring-2 ring-offset-2 ring-green-500 shadow-md" 
+                              : "bg-green-100 text-green-700 hover:bg-green-200 border-green-200"
+                            : status === "Low Stock"
+                            ? selectedStatus === status 
+                              ? "bg-yellow-600 text-white hover:bg-yellow-700 ring-2 ring-offset-2 ring-yellow-500 shadow-md" 
+                              : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200"
+                            : selectedStatus === status 
+                              ? "bg-red-600 text-white hover:bg-red-700 ring-2 ring-offset-2 ring-red-500 shadow-md" 
+                              : "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
+                        }`}
                         onClick={() => setSelectedStatus(selectedStatus === status ? null : status)}
                       >
                         {status}
@@ -595,7 +633,7 @@ export default function InventoryPage() {
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="font-medium text-gray-900">{item.lastUpdated}</span>
+                      <span className="font-medium text-gray-900">{new Date(item.updated_at).toLocaleDateString()}</span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-2">

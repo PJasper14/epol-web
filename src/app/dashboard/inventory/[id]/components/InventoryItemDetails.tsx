@@ -14,8 +14,9 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 import { useState } from "react";
-import { CheckCircle, User, ArrowLeft } from "lucide-react";
+import { CheckCircle, User, ArrowLeft, Package, Edit3, History } from "lucide-react";
 import { useInventory, InventoryItem, Transaction } from "@/contexts/InventoryContext";
+import { useAdmin } from "@/contexts/AdminContext";
 
 interface InventoryItemDetailsProps {
   item: InventoryItem;
@@ -24,7 +25,10 @@ interface InventoryItemDetailsProps {
 
 export default function InventoryItemDetails({ item: initialItem, transactions: initialTransactions }: InventoryItemDetailsProps) {
   // Use the inventory context
-  const { updateInventoryItem, addTransaction } = useInventory();
+  const { updateInventoryItem, adjustStock, getInventoryItem, getInventoryTransactions } = useInventory();
+  
+  // Use the admin context to get current user
+  const { admin } = useAdmin();
   
   // State for the item and transactions
   const [item, setItem] = useState<InventoryItem>(initialItem);
@@ -34,7 +38,6 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
   const [action, setAction] = useState<"Add" | "Remove">("Add");
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState("");
-  const [user, setUser] = useState(""); // New user input field
   
   // Modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -42,7 +45,6 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
   
   // Validation state
   const [validationErrors, setValidationErrors] = useState({
-    user: "",
     quantity: ""
   });
 
@@ -50,23 +52,17 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
     setAction(newAction);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Reset validation errors
-    setValidationErrors({ user: "", quantity: "" });
+    setValidationErrors({ quantity: "" });
     
-    // Validate all required fields
+    // Validate required fields
     let hasErrors = false;
     const errors = {
-      user: "",
       quantity: ""
     };
-    
-    if (!user.trim()) {
-      errors.user = "User name is required";
-      hasErrors = true;
-    }
     
     if (quantity <= 0) {
       errors.quantity = "Quantity must be greater than 0";
@@ -78,55 +74,49 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
       return;
     }
     
-    // Calculate the new quantity
-    const changeAmount = action === "Add" ? quantity : -quantity;
-    const newQuantity = Math.max(0, item.quantity + changeAmount); // Ensure it doesn't go below 0
-    
-    // Update the item
-    const updatedItem = {
-      ...item,
-      quantity: newQuantity,
-      lastUpdated: new Date().toISOString().split('T')[0] // Update to today's date
-    };
-    
-    // Create a new transaction
-    const newTransaction = {
-      id: Math.max(0, ...transactions.map(t => t.id)) + 1, // Generate a new ID
-      date: new Date().toISOString().split('T')[0],
-      user: user.trim(), // Use the user input instead of hardcoded value
-      action: action,
-      quantity: changeAmount,
-      notes: notes || (action === "Add" ? "Stock added" : "Stock removed")
-    };
-    
-    // Update local state
-    setItem(updatedItem);
-    setTransactions([newTransaction, ...transactions]); // Add to the beginning
-    
-    // Update context state (this will update the main inventory page)
-    updateInventoryItem(updatedItem);
-    addTransaction(item.id, newTransaction);
-    
-    // Show success message
-    setSuccessMessage(`${action === "Add" ? "Added" : "Removed"} ${quantity} ${item.unit} ${action === "Add" ? "to" : "from"} inventory by ${user.trim()}`);
-    setShowSuccessModal(true);
-    
-    // Reset form
-    setQuantity(1);
-    setNotes("");
-    setUser(""); // Reset user field
+    try {
+      // Use the context's adjustStock method which calls the API
+      await adjustStock(
+        item.id,
+        action === "Add" ? "in" : "out",
+        quantity,
+        notes || (action === "Add" ? "Stock added" : "Stock removed")
+      );
+      
+      // Refresh the item and transactions from the API
+      const updatedItem = await getInventoryItem(item.id);
+      const updatedTransactions = await getInventoryTransactions(item.id);
+      
+      if (updatedItem) {
+        setItem(updatedItem);
+      }
+      if (updatedTransactions) {
+        setTransactions(updatedTransactions);
+      }
+      
+      // Show success message
+      setSuccessMessage(`${action === "Add" ? "Added" : "Removed"} ${quantity} ${item.unit} ${action === "Add" ? "to" : "from"} inventory by ${admin?.name || "Admin User"}`);
+      setShowSuccessModal(true);
+      
+      // Reset form
+      setQuantity(1);
+      setNotes("");
+    } catch (error) {
+      console.error('Error adjusting stock:', error);
+      // You could add error handling here if needed
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Inventory Item Details</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Inventory Item Details</h1>
           <p className="text-gray-600">Detailed information for {item.name}</p>
         </div>
         <Link 
           href="/dashboard/inventory" 
-          className="px-4 py-2 bg-white border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors flex items-center gap-2"
+          className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 rounded-md flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Inventory
@@ -135,9 +125,17 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Item Details */}
-        <Card className="bg-white shadow-md border-gray-200">
+        <Card className="border-l-4 border-l-blue-500 bg-white shadow-lg">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-lg border-b border-blue-200">
-            <CardTitle className="text-xl font-semibold text-gray-900">Item Details</CardTitle>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center shadow-md">
+                <Package className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl text-gray-900">Item Details</CardTitle>
+                <p className="text-base text-gray-600">Detailed information for {item.name}</p>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4 p-6">
             <div className="flex justify-between items-start">
@@ -165,7 +163,7 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-600">Last Updated</p>
-                <p className="font-semibold text-gray-900">{item.lastUpdated}</p>
+                <p className="font-semibold text-gray-900">{new Date(item.updated_at).toLocaleDateString()}</p>
               </div>
             </div>
 
@@ -189,9 +187,17 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
         </Card>
 
         {/* Add/Remove Stock Form */}
-        <Card className="bg-white shadow-md border-gray-200">
+        <Card className="border-l-4 border-l-green-500 bg-white shadow-lg">
           <CardHeader className="bg-gradient-to-r from-green-50 to-green-100 rounded-t-lg border-b border-green-200">
-            <CardTitle className="text-xl font-semibold text-gray-900">Update Inventory</CardTitle>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-green-600 flex items-center justify-center shadow-md">
+                <Edit3 className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl text-gray-900">Update Inventory</CardTitle>
+                <p className="text-base text-gray-600">Add or remove stock for this item</p>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-6">
             <form className="space-y-4" onSubmit={handleSubmit}>
@@ -214,37 +220,9 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
                   </Button>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <label htmlFor="user" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Name <span className="text-red-500">*</span>
-                </label>
-                <Input 
-                  id="user" 
-                  type="text" 
-                  placeholder="Enter your name" 
-                  value={user}
-                  onChange={(e) => {
-                    setUser(e.target.value);
-                                         // Clear validation error when user starts typing
-                     if (validationErrors.user) {
-                       setValidationErrors({ user: "", quantity: validationErrors.quantity });
-                     }
-                  }}
-                  className={`border-gray-300 focus:border-red-500 focus:ring-red-500 ${
-                    validationErrors.user ? 'border-red-500' : ''
-                  }`}
-                  required
-                />
-                {validationErrors.user && (
-                  <p className="text-sm text-red-600 mt-1">{validationErrors.user}</p>
-                )}
-              </div>
-
-                             <div className="space-y-2">
+                <div className="space-y-2">
                  <label htmlFor="quantity" className="text-sm font-medium text-gray-700">Quantity ({item.unit}) <span className="text-red-500">*</span></label>
-                                 <Input 
+                  <Input 
                    id="quantity" 
                    type="number" 
                    min="1" 
@@ -254,13 +232,13 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
                      setQuantity(newQuantity);
                      // Clear validation error when user starts typing
                      if (validationErrors.quantity) {
-                       setValidationErrors({ user: validationErrors.user, quantity: "" });
+                       setValidationErrors({ quantity: "" });
                      }
                    }}
                    className={`border-gray-300 focus:border-red-500 focus:ring-red-500 ${
                      validationErrors.quantity ? 'border-red-500' : ''
                    }`}
-                                  />
+                  />
                  {validationErrors.quantity && (
                    <p className="text-sm text-red-600 mt-1">{validationErrors.quantity}</p>
                  )}
@@ -283,7 +261,7 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
               </div>
 
                              <Button 
-                 className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md" 
+                 className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
                  type="submit"
                  disabled={action === "Remove" && quantity > item.quantity}
                >
@@ -295,45 +273,75 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
       </div>
 
       {/* Transaction History */}
-      <Card className="bg-white shadow-md border-gray-200">
+      <Card className="border-l-4 border-l-purple-500 bg-white shadow-lg">
         <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-t-lg border-b border-purple-200">
-          <CardTitle className="text-xl font-semibold text-gray-900">Transaction History</CardTitle>
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-purple-600 flex items-center justify-center shadow-md">
+              <History className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-xl text-gray-900">Transaction History</CardTitle>
+              <p className="text-base text-gray-600">{transactions.length} transactions recorded</p>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead className="font-semibold text-gray-700">Date</TableHead>
-                <TableHead className="font-semibold text-gray-700">Name</TableHead>
-                <TableHead className="font-semibold text-gray-700">Action</TableHead>
-                <TableHead className="font-semibold text-gray-700">Quantity</TableHead>
-                <TableHead className="font-semibold text-gray-700">Notes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {transactions.map((transaction) => (
-                <TableRow key={transaction.id} className="hover:bg-gray-50 transition-colors">
-                  <TableCell className="font-medium text-gray-900">{transaction.date}</TableCell>
-                  <TableCell className="font-medium text-gray-900">{transaction.user}</TableCell>
-                  <TableCell>
-                    <Badge className={`px-3 py-1 text-sm font-medium border ${
-                      transaction.action === "Add" 
-                        ? "bg-green-100 text-green-800 border-green-200" 
-                        : "bg-red-100 text-red-800 border-red-200"
-                    }`}>
-                      {transaction.action}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className={`font-semibold ${transaction.quantity > 0 ? "text-green-600" : "text-red-600"}`}>
-                    {transaction.quantity > 0 ? `+${transaction.quantity}` : transaction.quantity}
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate text-gray-700">
-                    {transaction.notes}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Action
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Quantity
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Notes
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {transactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <td className="py-4 px-6">
+                      <div className="font-semibold text-gray-900">{new Date(transaction.created_at).toLocaleDateString()}</div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="font-medium text-gray-900">
+                        {transaction.user ? `${transaction.user.first_name} ${transaction.user.last_name}` : 'Unknown User'}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <Badge className={`px-3 py-1 text-sm font-medium border ${
+                        transaction.type === "in" 
+                          ? "bg-green-100 text-green-800 border-green-200" 
+                          : "bg-red-100 text-red-800 border-red-200"
+                      }`}>
+                        {transaction.type === "in" ? "Add" : transaction.type === "out" ? "Remove" : "Adjustment"}
+                      </Badge>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className={`font-semibold ${transaction.quantity > 0 ? "text-green-600" : "text-red-600"}`}>
+                        {transaction.quantity > 0 ? `+${transaction.quantity}` : transaction.quantity}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="max-w-xs truncate text-gray-700">
+                        {transaction.reason || 'No reason provided'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -347,7 +355,7 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
               <p className="text-gray-600 mb-6 text-center">{successMessage}</p>
               <Button 
                 onClick={() => setShowSuccessModal(false)}
-                className="bg-red-600 hover:bg-red-700 text-white shadow-md"
+                className="bg-red-600 hover:bg-red-700 text-white shadow-sm"
               >
                 Close
               </Button>

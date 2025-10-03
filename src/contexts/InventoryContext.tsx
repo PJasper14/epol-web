@@ -1,311 +1,233 @@
 "use client";
 
-import React, { createContext, useState, useContext, ReactNode } from "react";
+import React, { createContext, useState, useContext, ReactNode, useEffect } from "react";
+import { inventoryApi } from "../services/inventoryApi";
 
 // Define types
 export interface InventoryItem {
   id: string;
   name: string;
-  quantity: number;
   unit: string;
+  quantity: number;
   threshold: number;
-  lastUpdated: string;
+  created_at: string;
+  updated_at: string;
   status?: string;
 }
 
 export interface Transaction {
   id: number;
-  date: string;
-  user: string;
-  action: string;
+  type: 'in' | 'out' | 'adjustment';
   quantity: number;
-  notes: string;
-  purchaseOrderId?: string; // Reference to purchase order if applicable
+  previous_stock: number;
+  new_stock: number;
+  reason?: string;
+  user_id: number;
+  inventory_request_id?: number;
+  created_at: string;
+  updated_at: string;
+  user?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
+  // Additional fields for display
+  date?: string;
+  action?: string;
+  notes?: string;
 }
 
 interface InventoryContextType {
   inventoryItems: InventoryItem[];
-  addInventoryItem: (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => void;
-  updateInventoryItem: (updatedItem: InventoryItem) => void;
-  deleteInventoryItem: (id: string) => void;
-  getInventoryItem: (id: string) => InventoryItem | undefined;
-  getInventoryTransactions: (itemId: string) => Transaction[];
-  addTransaction: (itemId: string, transaction: Transaction) => void;
-  // New methods for purchase order integration
-  receivePurchaseOrder: (poId: string, itemUpdates: { itemId: string, quantity: number }[], receivedBy: string) => void;
-  getLowStockItems: () => InventoryItem[];
-  getOutOfStockItems: () => InventoryItem[];
+  loading: boolean;
+  error: string | null;
+  addInventoryItem: (item: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateInventoryItem: (id: string, updatedItem: Partial<InventoryItem>) => Promise<void>;
+  deleteInventoryItem: (id: string) => Promise<void>;
+  getInventoryItem: (id: string) => Promise<InventoryItem | null>;
+  getInventoryTransactions: (itemId: string) => Promise<Transaction[]>;
+  adjustStock: (itemId: string, type: 'in' | 'out' | 'adjustment', quantity: number, reason: string) => Promise<void>;
+  getLowStockItems: () => Promise<InventoryItem[]>;
+  getOutOfStockItems: () => Promise<InventoryItem[]>;
+  refreshInventory: () => Promise<void>;
 }
 
 // Create the context
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-// Initialize with mock data
-const initialInventoryItems: InventoryItem[] = [
-  { 
-    id: "INV-001", 
-    name: "Sako", 
-    quantity: 2000, 
-    unit: "Bundles", 
-    threshold: 500,
-    lastUpdated: "2023-04-18",
-  },
-  { 
-    id: "INV-002", 
-    name: "Dust Pan", 
-    quantity: 1200, 
-    unit: "Pcs", 
-    threshold: 300,
-    lastUpdated: "2023-04-16",
-  },
-  { 
-    id: "INV-003", 
-    name: "Walis Tingting (Kaong)", 
-    quantity: 2400, 
-    unit: "Pcs", 
-    threshold: 500,
-    lastUpdated: "2023-04-10",
-  },
-  { 
-    id: "INV-004", 
-    name: "Knitted Gloves", 
-    quantity: 4000, 
-    unit: "Pairs", 
-    threshold: 1000,
-    lastUpdated: "2023-04-15",
-  },
-  { 
-    id: "INV-005", 
-    name: "Rubber Gloves", 
-    quantity: 400, 
-    unit: "Pairs", 
-    threshold: 100,
-    lastUpdated: "2023-04-12",
-  },
-  { 
-    id: "INV-006", 
-    name: "Raincoat", 
-    quantity: 500, 
-    unit: "Pcs", 
-    threshold: 100,
-    lastUpdated: "2023-04-05",
-  },
-  { 
-    id: "INV-007", 
-    name: "Sickle (Karit) RS Brand", 
-    quantity: 0, 
-    unit: "Pcs", 
-    threshold: 50,
-    lastUpdated: "2023-04-14",
-  },
-  { 
-    id: "INV-008", 
-    name: "Panabas (Itak) RS Brand", 
-    quantity: 0, 
-    unit: "Pcs", 
-    threshold: 50,
-    lastUpdated: "2023-04-14",
-  },
-  { 
-    id: "INV-009", 
-    name: "Hasaan (WhetStone)", 
-    quantity: 14, 
-    unit: "Pcs", 
-    threshold: 20,
-    lastUpdated: "2023-04-14",
-  },
-  { 
-    id: "INV-010", 
-    name: "Boots", 
-    quantity: 500, 
-    unit: "Pairs", 
-    threshold: 100,
-    lastUpdated: "2023-04-14",
-  },
-  { 
-    id: "INV-011", 
-    name: "Kalaykay", 
-    quantity: 20, 
-    unit: "Pcs", 
-    threshold: 30,
-    lastUpdated: "2023-04-14",
-  },
-  { 
-    id: "INV-012", 
-    name: "Palang Lapad No.8", 
-    quantity: 125, 
-    unit: "Pcs", 
-    threshold: 50,
-    lastUpdated: "2023-04-14",
-  },
-  { 
-    id: "INV-013", 
-    name: "Asarol", 
-    quantity: 125, 
-    unit: "Pcs", 
-    threshold: 50,
-    lastUpdated: "2023-04-14",
-  },
-];
-
-// Initialize transactions data
-const initialTransactions: Record<string, Transaction[]> = {
-  "INV-001": [
-    {
-      id: 1,
-      date: "2023-04-18",
-      user: "John Smith",
-      action: "Remove",
-      quantity: -250,
-      notes: "Distributed for cleanup operation",
-    },
-    {
-      id: 2,
-      date: "2023-04-10",
-      user: "Sarah Johnson",
-      action: "Add",
-      quantity: 1000,
-      notes: "Restocked from supplier",
-    },
-    {
-      id: 3,
-      date: "2023-04-01",
-      user: "James Rodriguez",
-      action: "Remove",
-      quantity: -50,
-      notes: "Damaged items removed from inventory",
-    },
-    {
-      id: 4,
-      date: "2023-03-15",
-      user: "Admin",
-      action: "Add",
-      quantity: 1300,
-      notes: "Initial stock entry",
-    },
-  ]
-};
+// Initialize with empty data - will be loaded from API
 
 // Create the provider component
 export function InventoryProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<InventoryItem[]>(initialInventoryItems);
-  const [transactions, setTransactions] = useState<Record<string, Transaction[]>>(initialTransactions);
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Update an inventory item
-  const updateInventoryItem = (updatedItem: InventoryItem) => {
-    setItems(prevItems => 
-      prevItems.map(item => 
-        item.id === updatedItem.id ? updatedItem : item
-      )
-    );
+  // Load inventory items from API
+  const loadInventoryItems = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await inventoryApi.getInventoryItems();
+      setItems(response.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load inventory items');
+      console.error('Error loading inventory items:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Load inventory items on component mount
+  useEffect(() => {
+    loadInventoryItems();
+  }, []);
+
   // Add a new inventory item
-  const addInventoryItem = (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => {
-    const newItem: InventoryItem = {
-      id: `INV-${items.length + 1}`, // Simple ID generation
-      ...item,
-      lastUpdated: new Date().toISOString().split('T')[0],
-    };
-    setItems(prevItems => [...prevItems, newItem]);
+  const addInventoryItem = async (item: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await inventoryApi.createInventoryItem({
+        name: item.name,
+        unit: item.unit,
+        quantity: item.quantity,
+        threshold: item.threshold,
+      });
+      
+      // Refresh the inventory list
+      await loadInventoryItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add inventory item');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update an inventory item
+  const updateInventoryItem = async (id: string, updatedItem: Partial<InventoryItem>) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await inventoryApi.updateInventoryItem(id, {
+        name: updatedItem.name!,
+        unit: updatedItem.unit!,
+        threshold: updatedItem.threshold!,
+      });
+      
+      // Refresh the inventory list
+      await loadInventoryItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update inventory item');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Delete an inventory item
-  const deleteInventoryItem = (id: string) => {
-    setItems(prevItems => prevItems.filter(item => item.id !== id));
-    setTransactions(prev => {
-      const newState = { ...prev };
-      delete newState[id];
-      return newState;
-    });
+  const deleteInventoryItem = async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await inventoryApi.deleteInventoryItem(id);
+      
+      // Refresh the inventory list
+      await loadInventoryItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete inventory item');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Get a specific inventory item by ID
-  const getInventoryItem = (id: string) => {
-    return items.find(item => item.id === id);
+  const getInventoryItem = async (id: string): Promise<InventoryItem | null> => {
+    try {
+      const response = await inventoryApi.getInventoryItem(id);
+      return response;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get inventory item');
+      return null;
+    }
   };
 
   // Get transactions for a specific item
-  const getInventoryTransactions = (itemId: string) => {
-    return transactions[itemId] || [];
+  const getInventoryTransactions = async (itemId: string): Promise<Transaction[]> => {
+    try {
+      const response = await inventoryApi.getInventoryTransactions(itemId);
+      return response.transactions?.data || [];
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get inventory transactions');
+      return [];
+    }
   };
 
-  // Add a transaction for an item
-  const addTransaction = (itemId: string, transaction: Transaction) => {
-    setTransactions(prev => ({
-      ...prev,
-      [itemId]: [transaction, ...(prev[itemId] || [])]
-    }));
-  };
-
-  // Get items with quantity below threshold
-  const getLowStockItems = () => {
-    return items.filter(item => item.quantity > 0 && item.quantity < item.threshold);
-  };
-
-  // Get items with zero quantity
-  const getOutOfStockItems = () => {
-    return items.filter(item => item.quantity === 0);
-  };
-
-  // Receive items from a purchase order
-  const receivePurchaseOrder = (poId: string, itemUpdates: { itemId: string, quantity: number }[], receivedBy: string) => {
-    // Update each item's quantity
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Create a copy of the items array
-    const updatedItems = [...items];
-    
-    // Update each item and create transactions
-    itemUpdates.forEach(({ itemId, quantity }) => {
-      // Find the item index
-      const itemIndex = updatedItems.findIndex(item => item.id === itemId);
+  // Adjust stock for an item
+  const adjustStock = async (itemId: string, type: 'in' | 'out' | 'adjustment', quantity: number, reason: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await inventoryApi.adjustStock(itemId, {
+        type,
+        quantity,
+        reason,
+      });
       
-      if (itemIndex !== -1) {
-        // Update the item
-        const item = updatedItems[itemIndex];
-        updatedItems[itemIndex] = {
-          ...item,
-          quantity: item.quantity + quantity,
-          lastUpdated: today
-        };
-        
-        // Create a transaction
-        const newTransaction: Transaction = {
-          id: Math.max(0, ...(transactions[itemId] || []).map(t => t.id)) + 1,
-          date: today,
-          user: receivedBy,
-          action: "Add",
-          quantity: quantity,
-          notes: `Received from Purchase Order ${poId}`,
-          purchaseOrderId: poId
-        };
-        
-        // Add the transaction
-        setTransactions(prev => ({
-          ...prev,
-          [itemId]: [newTransaction, ...(prev[itemId] || [])]
-        }));
-      }
-    });
-    
-    // Update all items at once
-    setItems(updatedItems);
+      // Refresh the inventory list
+      await loadInventoryItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to adjust stock');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get low stock items
+  const getLowStockItems = async (): Promise<InventoryItem[]> => {
+    try {
+      const response = await inventoryApi.getLowStockItems();
+      return response.data || [];
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get low stock items');
+      return [];
+    }
+  };
+
+  // Get out of stock items
+  const getOutOfStockItems = async (): Promise<InventoryItem[]> => {
+    try {
+      const response = await inventoryApi.getInventoryItems({ stock_status: 'out_of_stock' });
+      return response.data || [];
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get out of stock items');
+      return [];
+    }
+  };
+
+  // Refresh inventory
+  const refreshInventory = async () => {
+    await loadInventoryItems();
   };
 
   return (
     <InventoryContext.Provider
       value={{
         inventoryItems: items,
+        loading,
+        error,
         addInventoryItem,
         updateInventoryItem,
         deleteInventoryItem,
         getInventoryItem,
         getInventoryTransactions,
-        addTransaction,
-        receivePurchaseOrder,
+        adjustStock,
         getLowStockItems,
-        getOutOfStockItems
+        getOutOfStockItems,
+        refreshInventory
       }}
     >
       {children}

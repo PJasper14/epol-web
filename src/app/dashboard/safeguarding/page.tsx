@@ -3,12 +3,43 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertCircle, Download, Filter, Search, ShieldAlert, Clock, CheckCircle, AlertTriangle, X, Eye, Trash2 } from "lucide-react";
+import { AlertCircle, Download, Filter, Search, ShieldAlert, Clock, CheckCircle, AlertTriangle, X, Eye, Trash2, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useIncidentContext } from "./IncidentContext";
 import { generateSafeguardingPDF } from "@/utils/safeguardingPdfExport";
+
+// Official incident types by priority (matching mobile app)
+const incidentTypes = {
+  high: [
+    'Serious Injury',
+    'Medical Emergency',
+    'Traffic Accident',
+    'Security Threat',
+    'Fire Emergency',
+    'Wildlife Attack',
+    'Chemical Exposure'
+  ],
+  medium: [
+    'Minor Injury',
+    'Tool Damage',
+    'Road Obstruction',
+    'Workplace Dispute',
+    'Public Complaint',
+    'Property Damage',
+    'Illegal Dumping'
+  ],
+  low: [
+    'Vandalism',
+    'Cracked Pavements',
+    'Damaged Public Utility',
+    'Uniform Issue',
+    'Area Access Issue',
+    'System Performance Issue',
+    'Weather-related Delays'
+  ]
+};
 
 // Helper function to convert 24-hour time to 12-hour format
 const formatTimeTo12Hour = (time24: string) => {
@@ -17,6 +48,14 @@ const formatTimeTo12Hour = (time24: string) => {
   const ampm = hour >= 12 ? 'PM' : 'AM';
   const hour12 = hour % 12 || 12;
   return `${hour12}:${minutes} ${ampm}`;
+};
+
+// Function to get priority from incident type
+const getPriorityFromIncidentType = (incidentType: string): string => {
+  if (incidentTypes.high.includes(incidentType)) return 'High';
+  if (incidentTypes.medium.includes(incidentType)) return 'Medium';
+  if (incidentTypes.low.includes(incidentType)) return 'Low';
+  return 'Medium'; // Default fallback
 };
 
 export default function SafeguardingRecordsPage() {
@@ -121,12 +160,38 @@ export default function SafeguardingRecordsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Safeguarding Records</h1>
-        <p className="text-gray-500">Monitor and manage environmental incident reports</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Safeguarding Records</h1>
+            <p className="text-gray-500">Monitor and manage street sweeping incident reports</p>
+          </div>
+          <Link href="/dashboard">
+            <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Processing Status Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <Card className="border-l-4 border-l-red-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 font-medium mb-1">Total Reports</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">
+                  {incidents.length}
+                </p>
+              </div>
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center shadow-md">
+                <ShieldAlert className="h-7 w-7 text-red-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
         <Card className="border-l-4 border-l-yellow-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -194,16 +259,16 @@ export default function SafeguardingRecordsPage() {
               <Button 
                 variant={showFilters ? "default" : "outline"}
                 size="icon" 
-                className={`h-10 w-10 relative transition-all duration-200 ${
+                className={`h-11 w-11 relative transition-all duration-200 ${
                   showFilters 
                     ? "bg-red-600 text-white hover:bg-red-700 shadow-md" 
-                    : "hover:bg-gray-100"
+                    : "border-gray-300 hover:bg-gray-50 hover:border-gray-400"
                 }`}
                 onClick={() => setShowFilters(!showFilters)}
               >
-                <Filter className={`h-4 w-4 ${showFilters ? "text-white" : "text-gray-500"}`} />
+                <Filter className={`h-5 w-5 ${showFilters ? "text-white" : "text-gray-600"}`} />
                 {hasActiveFilters && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm">
+                  <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
                     {[selectedPriority, selectedStatus].filter(Boolean).length}
                   </span>
                 )}
@@ -240,7 +305,19 @@ export default function SafeguardingRecordsPage() {
                         key={status}
                         variant={selectedStatus === status ? "default" : "outline"}
                         size="sm"
-                        className={`${getStatusColor(status)} ${selectedStatus === status ? "ring-2 ring-offset-2" : ""}`}
+                        className={`${
+                          status === "Pending" 
+                            ? selectedStatus === status 
+                              ? "bg-yellow-600 text-white hover:bg-yellow-700 ring-2 ring-offset-2 ring-yellow-500 shadow-md" 
+                              : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200"
+                            : status === "Ongoing"
+                            ? selectedStatus === status 
+                              ? "bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-offset-2 ring-blue-500 shadow-md" 
+                              : "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"
+                            : selectedStatus === status 
+                              ? "bg-green-600 text-white hover:bg-green-700 ring-2 ring-offset-2 ring-green-500 shadow-md" 
+                              : "bg-green-100 text-green-700 hover:bg-green-200 border-green-200"
+                        }`}
                         onClick={() => setSelectedStatus(selectedStatus === status ? null : status)}
                       >
                         {status}
@@ -259,7 +336,19 @@ export default function SafeguardingRecordsPage() {
                         key={priority}
                         variant={selectedPriority === priority ? "default" : "outline"}
                         size="sm"
-                        className={`${getPriorityColor(priority)} ${selectedPriority === priority ? "ring-2 ring-offset-2" : ""}`}
+                        className={`${
+                          priority === "Low" 
+                            ? selectedPriority === priority 
+                              ? "bg-green-600 text-white hover:bg-green-700 ring-2 ring-offset-2 ring-green-500 shadow-md" 
+                              : "bg-green-100 text-green-700 hover:bg-green-200 border-green-200"
+                            : priority === "Medium"
+                            ? selectedPriority === priority 
+                              ? "bg-yellow-600 text-white hover:bg-yellow-700 ring-2 ring-offset-2 ring-yellow-500 shadow-md" 
+                              : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200"
+                            : selectedPriority === priority 
+                              ? "bg-red-600 text-white hover:bg-red-700 ring-2 ring-offset-2 ring-red-500 shadow-md" 
+                              : "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
+                        }`}
                         onClick={() => setSelectedPriority(selectedPriority === priority ? null : priority)}
                       >
                         {priority}
@@ -286,7 +375,7 @@ export default function SafeguardingRecordsPage() {
             <div>
               <CardTitle className="text-xl text-gray-900">Incident Reports</CardTitle>
               <CardDescription className="text-base text-gray-600">
-                {filteredReports.length} reports • Environmental safeguarding reports submitted from mobile app
+                {filteredReports.length} reports • Street sweeping incident reports submitted from mobile app
               </CardDescription>
             </div>
           </div>
@@ -309,16 +398,10 @@ export default function SafeguardingRecordsPage() {
                     Date & Time
                   </th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
-                    Reported By
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
                     Priority
                   </th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
                     Status
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
-                    Last Updated
                   </th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
                     Actions
@@ -342,13 +425,10 @@ export default function SafeguardingRecordsPage() {
                       <div className="text-sm text-gray-500">{formatTimeTo12Hour(report.time)}</div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="font-medium text-gray-900">{report.reportedBy}</span>
-                    </td>
-                    <td className="py-4 px-6">
                       <span
-                        className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getPriorityColor(report.priority || "Low")}`}
+                        className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getPriorityColor(report.priority || getPriorityFromIncidentType(report.title))}`}
                       >
-                        {report.priority || "Low"}
+                        {report.priority || getPriorityFromIncidentType(report.title)}
                       </span>
                     </td>
                     <td className="py-4 px-6">
@@ -357,16 +437,6 @@ export default function SafeguardingRecordsPage() {
                       >
                         {report.status}
                       </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      {report.lastUpdated ? (
-                        <div>
-                          <div className="font-medium text-gray-900">{new Date(report.lastUpdated).toLocaleDateString()}</div>
-                          <div className="text-sm text-gray-500">{new Date(report.lastUpdated).toLocaleTimeString()}</div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-500">Not updated</span>
-                      )}
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-2">
@@ -394,7 +464,7 @@ export default function SafeguardingRecordsPage() {
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={9} className="py-12 px-6 text-center">
+                    <td colSpan={7} className="py-12 px-6 text-center">
                       <div className="flex flex-col items-center gap-4">
                         <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
                           <ShieldAlert className="h-8 w-8 text-gray-400" />

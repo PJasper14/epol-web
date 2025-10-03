@@ -23,71 +23,16 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  UserRound
+  UserRound,
+  ArrowLeft
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePasswordReset } from '@/contexts/PasswordResetContext';
+import { useUser } from '@/contexts/UserContext';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'Admin' | 'Team Leader' | 'EPOL';
-  department: 'Office' | 'Field';
-  lastLogin: string;
-  createdAt: string;
-}
-
-const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    email: 'john.doe@epol.com',
-    role: 'Admin',
-    department: 'Office',
-    lastLogin: '2024-01-15 10:30',
-    createdAt: '2024-01-01'
-  },
-  {
-    id: '2',
-    name: 'Jane Smith',
-    email: 'jane.smith@epol.com',
-    role: 'Team Leader',
-    department: 'Field',
-    lastLogin: '2024-01-15 09:15',
-    createdAt: '2024-01-02'
-  },
-  {
-    id: '3',
-    name: 'Mike Johnson',
-    email: 'mike.johnson@epol.com',
-    role: 'EPOL',
-    department: 'Field',
-    lastLogin: 'Never',
-    createdAt: '2024-01-14'
-  },
-  {
-    id: '4',
-    name: 'Sarah Wilson',
-    email: 'sarah.wilson@epol.com',
-    role: 'Admin',
-    department: 'Office',
-    lastLogin: '2024-01-14 16:45',
-    createdAt: '2024-01-03'
-  },
-  {
-    id: '5',
-    name: 'David Brown',
-    email: 'david.brown@epol.com',
-    role: 'EPOL',
-    department: 'Field',
-    lastLogin: '2024-01-13 14:20',
-    createdAt: '2024-01-05'
-  }
-];
 
 export default function AccountManagementPage() {
-  const [users] = useState<User[]>(mockUsers);
+  const { users } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
@@ -98,7 +43,8 @@ export default function AccountManagementPage() {
   const itemsPerPage = 10;
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const fullName = `${user.firstName} ${user.lastName}`;
+    const matchesSearch = fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = !selectedRole || user.role === selectedRole;
     
@@ -127,13 +73,6 @@ export default function AccountManagementPage() {
     }
   };
 
-  const getDepartmentColor = (department: string) => {
-    switch (department) {
-      case 'Office': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Field': return 'bg-orange-100 text-orange-800 border-orange-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
 
   const hasActiveFilters = selectedRole;
 
@@ -142,28 +81,17 @@ export default function AccountManagementPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="mb-8">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Account Management</h1>
-            <p className="text-gray-600 text-lg">Manage user accounts, roles, and permissions across your organization</p>
+            <p className="text-gray-600 text-lg">Manage user accounts and roles across the organization</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/accounts/create">
-              <Button className="bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Create Account
-              </Button>
-            </Link>
-            <Link href="/dashboard/accounts/password-resets">
-              <Button className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
-                <Key className="h-4 w-4 mr-2" />
-                Password Reset Requests
-                <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-600 text-xs font-semibold rounded-full">
-                  {getPendingCount()}
-                </span>
-              </Button>
-            </Link>
-          </div>
+          <Link href="/dashboard">
+            <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -234,38 +162,61 @@ export default function AccountManagementPage() {
       </div>
 
 
-      {/* Search and Filters */}
+      {/* Search, Filters, and Actions */}
       <Card className="mb-6 bg-white shadow-md border-gray-200">
         <CardContent className="pt-6">
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                <Input
-                  type="search"
-                  placeholder="Search users..."
-                  className="pl-10 w-full border-gray-300 focus:border-red-500 focus:ring-red-500"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+            {/* Search, Filter, and Action Controls */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-4">
+              {/* Search and Filter Controls */}
+              <div className="flex items-center gap-4 flex-1">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <Input
+                    type="search"
+                    placeholder="Search users..."
+                    className="pl-10 w-full border-gray-300 focus:border-red-500 focus:ring-red-500"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <Button 
+                  variant={showFilters ? "default" : "outline"}
+                  size="icon" 
+                  className={`h-11 w-11 relative transition-all duration-200 ${
+                    showFilters 
+                      ? "bg-red-600 text-white hover:bg-red-700 shadow-md" 
+                      : "border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+                  }`}
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  <Filter className={`h-5 w-5 ${showFilters ? "text-white" : "text-gray-600"}`} />
+                  {hasActiveFilters && (
+                    <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
+                      {selectedRole ? 1 : 0}
+                    </span>
+                  )}
+                </Button>
               </div>
-              <Button 
-                variant={showFilters ? "default" : "outline"}
-                size="icon" 
-                className={`h-11 w-11 relative transition-all duration-200 ${
-                  showFilters 
-                    ? "bg-red-600 text-white hover:bg-red-700 shadow-md" 
-                    : "border-gray-300 hover:bg-gray-50 hover:border-gray-400"
-                }`}
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className={`h-5 w-5 ${showFilters ? "text-white" : "text-gray-600"}`} />
-                {hasActiveFilters && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm">
-                    {selectedRole ? 1 : 0}
-                  </span>
-                )}
-              </Button>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 lg:flex-shrink-0">
+                <Link href="/dashboard/accounts/create">
+                  <Button className="bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Create Account
+                  </Button>
+                </Link>
+                <Link href="/dashboard/accounts/password-resets">
+                  <Button className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                    <Key className="h-4 w-4 mr-2" />
+                    Password Reset Requests
+                    <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-600 text-xs font-semibold rounded-full">
+                      {getPendingCount()}
+                    </span>
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             {showFilters && (
@@ -278,7 +229,19 @@ export default function AccountManagementPage() {
                         key={role}
                         variant={selectedRole === role ? "default" : "outline"}
                         size="sm"
-                        className={`${getRoleColor(role)} ${selectedRole === role ? "ring-2 ring-offset-2 ring-red-500 shadow-md" : "border-gray-300 hover:bg-gray-50"}`}
+                        className={`${
+                          role === "Admin" 
+                            ? selectedRole === role 
+                              ? "bg-red-600 text-white hover:bg-red-700 ring-2 ring-offset-2 ring-red-500 shadow-md" 
+                              : "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
+                            : role === "Team Leader"
+                            ? selectedRole === role 
+                              ? "bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-offset-2 ring-blue-500 shadow-md" 
+                              : "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"
+                            : selectedRole === role 
+                              ? "bg-green-600 text-white hover:bg-green-700 ring-2 ring-offset-2 ring-green-500 shadow-md" 
+                              : "bg-green-100 text-green-700 hover:bg-green-200 border-green-200"
+                        }`}
                         onClick={() => setSelectedRole(selectedRole === role ? null : role)}
                       >
                         {role}
@@ -320,13 +283,10 @@ export default function AccountManagementPage() {
                     Role
                   </th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
-                    Department
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
-                    Last Login
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
                     Created
+                  </th>
+                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                    Last Updated
                   </th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
                     Actions
@@ -336,7 +296,7 @@ export default function AccountManagementPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 px-6 text-center">
+                    <td colSpan={5} className="py-12 px-6 text-center">
                       <div className="flex flex-col items-center gap-4">
                         <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
                           <Users className="h-8 w-8 text-gray-400" />
@@ -352,7 +312,7 @@ export default function AccountManagementPage() {
                   currentUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50 transition-colors duration-150">
                       <td className="py-4 px-6">
-                        <div className="font-semibold text-gray-900">{user.name}</div>
+                        <div className="font-semibold text-gray-900">{user.firstName} {user.lastName}</div>
                         <div className="text-sm text-gray-500">ID: {user.id}</div>
                       </td>
                       <td className="py-4 px-6">
@@ -361,21 +321,12 @@ export default function AccountManagementPage() {
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <span className="font-medium text-gray-900">
-                          {user.department}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="font-medium text-gray-900">
-                          {user.lastLogin === 'Never' ? (
-                            <span className="text-gray-400 italic">Never</span>
-                          ) : (
-                            user.lastLogin
-                          )}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
                         <span className="font-medium text-gray-900">{user.createdAt}</span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="font-medium text-gray-900">
+                          {user.lastUpdated}
+                        </span>
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-2">
@@ -389,13 +340,15 @@ export default function AccountManagementPage() {
                               View Details
                             </Button>
                           </Link>
-                          <Button 
-                            variant="destructive" 
-                            size="sm" 
-                            className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white shadow-sm"
-                          >
-                            <UserX className="h-3.5 w-3.5" />
-                          </Button>
+                          <Link href={`/dashboard/accounts/${user.id}/delete`}>
+                            <Button 
+                              variant="destructive" 
+                              size="sm" 
+                              className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white shadow-sm"
+                            >
+                              <UserX className="h-3.5 w-3.5" />
+                            </Button>
+                          </Link>
                         </div>
                       </td>
                     </tr>

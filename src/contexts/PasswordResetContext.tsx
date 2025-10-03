@@ -1,89 +1,91 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { apiService } from '@/lib/api';
 
 export interface PasswordResetRequest {
   id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  userPhone: string;
-  requestedAt: string;
-  status: 'Pending' | 'Approved' | 'Rejected';
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  user_phone: string;
+  requested_at: string;
+  status: 'pending' | 'approved' | 'rejected';
   reason: string;
-  adminNotes?: string;
+  admin_notes?: string;
+  processed_by?: string;
+  processed_at?: string;
+  created_at: string;
+  updated_at: string;
+  user?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  };
 }
 
 interface PasswordResetContextType {
   requests: PasswordResetRequest[];
+  loading: boolean;
+  error: string | null;
   setRequests: (requests: PasswordResetRequest[]) => void;
   addRequest: (request: PasswordResetRequest) => void;
   updateRequest: (id: string, updates: Partial<PasswordResetRequest>) => void;
   deleteRequest: (id: string) => void;
+  approveRequest: (id: string, newPassword: string, adminNotes?: string) => Promise<void>;
+  rejectRequest: (id: string, adminNotes: string) => Promise<void>;
+  refreshRequests: () => Promise<void>;
   getPendingCount: () => number;
 }
 
 const PasswordResetContext = createContext<PasswordResetContextType | undefined>(undefined);
 
-// Mock data - in a real app, this would come from an API
-const initialRequests: PasswordResetRequest[] = [
-  {
-    id: '1',
-    userId: '2',
-    userName: 'Jane Smith',
-    userEmail: 'jane.smith@epol.com',
-    userPhone: '+63 912 345 6789',
-    requestedAt: '2024-01-15 14:30:00',
-    status: 'Pending',
-    reason: 'Forgot password, unable to access account'
-  },
-  {
-    id: '2',
-    userId: '3',
-    userName: 'Mike Johnson',
-    userEmail: 'mike.johnson@epol.com',
-    userPhone: '+63 923 456 7890',
-    requestedAt: '2024-01-15 10:15:00',
-    status: 'Approved',
-    reason: 'Account locked due to multiple failed login attempts',
-    adminNotes: 'Approved after verifying user identity via phone call'
-  },
-  {
-    id: '3',
-    userId: '4',
-    userName: 'Sarah Wilson',
-    userEmail: 'sarah.wilson@epol.com',
-    userPhone: '+63 934 567 8901',
-    requestedAt: '2024-01-14 16:45:00',
-    status: 'Rejected',
-    reason: 'Suspicious activity detected',
-    adminNotes: 'Request denied due to security concerns. User contacted for verification.'
-  },
-  {
-    id: '4',
-    userId: '5',
-    userName: 'Alex Rodriguez',
-    userEmail: 'alex.rodriguez@epol.com',
-    userPhone: '+63 945 678 9012',
-    requestedAt: '2024-01-16 09:20:00',
-    status: 'Pending',
-    reason: 'Password expired, need to reset for security compliance'
-  },
-  {
-    id: '5',
-    userId: '6',
-    userName: 'Maria Garcia',
-    userEmail: 'maria.garcia@epol.com',
-    userPhone: '+63 956 789 0123',
-    requestedAt: '2024-01-16 11:45:00',
-    status: 'Approved',
-    reason: 'Unable to remember password after vacation',
-    adminNotes: 'Identity verified through company directory'
-  }
-];
+// Transform API response to match our interface
+const transformApiRequest = (apiRequest: any): PasswordResetRequest => {
+  return {
+    id: apiRequest.id.toString(),
+    user_id: apiRequest.user_id.toString(),
+    user_name: apiRequest.user ? `${apiRequest.user.first_name} ${apiRequest.user.last_name}` : 'Unknown User',
+    user_email: apiRequest.user?.email || 'N/A',
+    user_phone: apiRequest.user?.phone || 'N/A',
+    requested_at: apiRequest.created_at,
+    status: apiRequest.status,
+    reason: apiRequest.reason || '',
+    admin_notes: apiRequest.admin_notes,
+    processed_by: apiRequest.processed_by?.toString(),
+    processed_at: apiRequest.processed_at,
+    created_at: apiRequest.created_at,
+    updated_at: apiRequest.updated_at,
+    user: apiRequest.user
+  };
+};
 
 export function PasswordResetProvider({ children }: { children: ReactNode }) {
-  const [requests, setRequests] = useState<PasswordResetRequest[]>(initialRequests);
+  const [requests, setRequests] = useState<PasswordResetRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load requests on mount
+  useEffect(() => {
+    refreshRequests();
+  }, []);
+
+  const refreshRequests = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiService.getPasswordResets();
+      const transformedRequests = response.data?.map(transformApiRequest) || [];
+      setRequests(transformedRequests);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load password reset requests');
+      console.error('Failed to load password reset requests:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const addRequest = (request: PasswordResetRequest) => {
     setRequests(prev => [...prev, request]);
@@ -97,20 +99,58 @@ export function PasswordResetProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const deleteRequest = (id: string) => {
-    setRequests(prev => prev.filter(request => request.id !== id));
+  const deleteRequest = async (id: string) => {
+    try {
+      // Note: Backend doesn't have delete endpoint, so we just remove from local state
+      setRequests(prev => prev.filter(request => request.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete request');
+    }
+  };
+
+  const approveRequest = async (id: string, newPassword: string, adminNotes?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await apiService.approvePasswordReset(id, newPassword, adminNotes);
+      await refreshRequests(); // Refresh to get updated data
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to approve request');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const rejectRequest = async (id: string, adminNotes: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await apiService.rejectPasswordReset(id, adminNotes);
+      await refreshRequests(); // Refresh to get updated data
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reject request');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getPendingCount = () => {
-    return requests.filter(request => request.status === 'Pending').length;
+    return requests.filter(request => request.status === 'pending').length;
   };
 
   const value: PasswordResetContextType = {
     requests,
+    loading,
+    error,
     setRequests,
     addRequest,
     updateRequest,
     deleteRequest,
+    approveRequest,
+    rejectRequest,
+    refreshRequests,
     getPendingCount
   };
 

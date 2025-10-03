@@ -6,6 +6,12 @@ import { InventoryProvider } from "@/contexts/InventoryContext";
 import { PurchaseOrderProvider } from "@/contexts/PurchaseOrderContext";
 import { IncidentProvider } from "@/app/dashboard/safeguarding/IncidentContext";
 import { PasswordResetProvider } from "@/contexts/PasswordResetContext";
+import { ReassignmentRequestProvider } from "@/contexts/ReassignmentRequestContext";
+import { ActivityProvider } from "@/contexts/ActivityContext";
+import { LocationProvider } from "@/contexts/LocationContext";
+import { AdminProvider } from "@/contexts/AdminContext";
+import { UserProvider } from "@/contexts/UserContext";
+import { AssignmentProvider } from "@/contexts/AssignmentContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,15 +48,27 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
-        <InventoryProvider>
-          <PurchaseOrderProvider>
-            <IncidentProvider>
-              <PasswordResetProvider>
-                {children}
-              </PasswordResetProvider>
-            </IncidentProvider>
-          </PurchaseOrderProvider>
-        </InventoryProvider>
+        <AdminProvider>
+          <UserProvider>
+            <ActivityProvider>
+              <LocationProvider>
+                <AssignmentProvider>
+                  <InventoryProvider>
+                    <PurchaseOrderProvider>
+                      <IncidentProvider>
+                        <PasswordResetProvider>
+                          <ReassignmentRequestProvider>
+                            {children}
+                          </ReassignmentRequestProvider>
+                        </PasswordResetProvider>
+                      </IncidentProvider>
+                    </PurchaseOrderProvider>
+                  </InventoryProvider>
+                </AssignmentProvider>
+              </LocationProvider>
+            </ActivityProvider>
+          </UserProvider>
+        </AdminProvider>
       </body>
     </html>
   );

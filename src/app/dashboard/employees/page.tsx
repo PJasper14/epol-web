@@ -16,293 +16,244 @@ import { useState } from "react";
 import { 
   Users, 
   MapPin, 
-  Plus, 
   Edit, 
-  Trash2, 
   Search, 
   Filter,
   UserPlus,
-  MapPinOff,
-  Building2,
-  Calendar
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  ArrowLeft,
+  User,
+  X,
+  UserCheck
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MOCK_WORKPLACE_LOCATIONS, WorkplaceLocation } from "@/types/location";
+import { useLocation } from "@/contexts/LocationContext";
+import { useReassignmentRequest } from "@/contexts/ReassignmentRequestContext";
+import { useUser } from "@/contexts/UserContext";
+import { useAssignment } from "@/contexts/AssignmentContext";
+import Link from "next/link";
 
 // Types for employee management
 interface Employee {
   id: string;
   name: string;
   position: string;
-  contactNumber: string;
-  email: string;
-  status: 'Active' | 'Inactive' | 'On Leave';
-  currentAssignment?: Assignment;
+  currentLocationId?: string;
 }
 
-interface Assignment {
-  id: string;
-  employeeId: string;
-  location: string;
-  position: string;
-  startDate: string;
-  endDate?: string;
-  status: 'Active' | 'Completed' | 'Reassigned';
-  notes?: string;
-}
-
-interface Location {
-  id: string;
-  name: string;
-  address: string;
-  type: 'Barangay' | 'District' | 'City Hall' | 'Field Office';
-  capacity: number;
-  currentStaff: number;
-}
 
 export default function EmployeeManagementPage() {
+  const { workplaceLocations } = useLocation();
+  const { getPendingCount } = useReassignmentRequest();
+  const { users } = useUser();
+  const { getAssignmentByUserId, createAssignment, updateAssignment, deleteAssignment, loading: assignmentLoading } = useAssignment();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [showReassignmentModal, setShowReassignmentModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
-  // Mock data for employees
-  const [employees, setEmployees] = useState<Employee[]>([
-    {
-      id: "EMP-001",
-      name: "John Smith",
-      position: "Environmental Officer",
-      contactNumber: "+63 912 345 6789",
-      email: "john.smith@epol.gov.ph",
-      status: "Active",
-      currentAssignment: {
-        id: "ASS-001",
-        employeeId: "EMP-001",
-        location: "Barangay Pulo",
-        position: "Environmental Officer",
-        startDate: "2024-01-15",
-        status: "Active",
-        notes: "Primary environmental monitoring and enforcement"
-      }
-    },
-    {
-      id: "EMP-002",
-      name: "Maria Santos",
-      position: "Senior Environmental Officer",
-      contactNumber: "+63 923 456 7890",
-      email: "maria.santos@epol.gov.ph",
-      status: "Active",
-      currentAssignment: {
-        id: "ASS-002",
-        employeeId: "EMP-002",
-        location: "Barangay Mamatid",
-        position: "Senior Environmental Officer",
-        startDate: "2024-02-01",
-        status: "Active",
-        notes: "Lead officer for waste management initiatives"
-      }
-    },
-    {
-      id: "EMP-003",
-      name: "Carlos Rodriguez",
-      position: "Environmental Inspector",
-      contactNumber: "+63 934 567 8901",
-      email: "carlos.rodriguez@epol.gov.ph",
-      status: "On Leave",
-      currentAssignment: {
-        id: "ASS-003",
-        employeeId: "EMP-003",
-        location: "Barangay Banay-banay",
-        position: "Environmental Inspector",
-        startDate: "2024-01-20",
-        endDate: "2024-03-15",
-        status: "Completed",
-        notes: "Temporary assignment completed"
-      }
-    }
-  ]);
+  // Convert users to employees and filter out Admin accounts
+  const employees: Employee[] = users
+    .filter(user => user.role !== 'Admin') // Only show EPOL and Team Leader
+    .map(user => {
+      const assignment = getAssignmentByUserId(user.id);
+      return {
+        id: user.id,
+        name: `${user.firstName} ${user.lastName}`,
+        position: user.role,
+        currentLocationId: assignment?.workplace_location_id?.toString() || undefined
+      };
+    });
 
-  // Mock data for locations
-  const [locations] = useState<Location[]>([
-    {
-      id: "LOC-001",
-      name: "Barangay Pulo",
-      address: "Pulo, Cabuyao, Laguna",
-      type: "Barangay",
-      capacity: 5,
-      currentStaff: 2
-    },
-    {
-      id: "LOC-002",
-      name: "Barangay Mamatid",
-      address: "Mamatid, Cabuyao, Laguna",
-      type: "Barangay",
-      capacity: 3,
-      currentStaff: 1
-    },
-    {
-      id: "LOC-003",
-      name: "Barangay Banay-banay",
-      address: "Banay-banay, Cabuyao, Laguna",
-      type: "Barangay",
-      capacity: 4,
-      currentStaff: 0
-    },
-    {
-      id: "LOC-004",
-      name: "EPOL Main Office",
-      address: "City Hall Complex, Cabuyao, Laguna",
-      type: "City Hall",
-      capacity: 10,
-      currentStaff: 5
-    }
-  ]);
 
-  // Form states
-  const [newEmployee, setNewEmployee] = useState({
-    name: "",
-    position: "",
-    contactNumber: "",
-    email: ""
-  });
 
   const [newAssignment, setNewAssignment] = useState({
-    locationId: "",
-    position: "",
-    startDate: "",
-    endDate: "",
-    notes: ""
+    locationId: ""
   });
 
-  // Filter employees based on search and status
+
+  // Filter employees based on search, position, and location
   const filteredEmployees = employees.filter(employee => {
     const matchesSearch = !searchQuery || 
       employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       employee.position.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = !selectedStatus || employee.status === selectedStatus;
-    return matchesSearch && matchesStatus;
+    const matchesPosition = !selectedPosition || employee.position === selectedPosition;
+    const matchesLocation = !selectedLocation || 
+      (employee.currentLocationId && workplaceLocations.find(loc => loc.id === employee.currentLocationId)?.name.includes(selectedLocation));
+    return matchesSearch && matchesPosition && matchesLocation;
   });
+
+  // Count active filters
+  const activeFiltersCount = [searchQuery, selectedPosition, selectedLocation].filter(Boolean).length;
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedEmployees = filteredEmployees.slice(startIndex, endIndex);
+
+  // Pagination functions
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // Reset to first page when search or filters change
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
+
+  const handlePositionChange = (position: string | null) => {
+    setSelectedPosition(position);
+    setCurrentPage(1);
+  };
+
+  const handleLocationChange = (location: string | null) => {
+    setSelectedLocation(location);
+    setCurrentPage(1);
+  };
+
+
+
+
+  // Helper function to get location name by ID
+  const getLocationName = (locationId: string): string => {
+    const location = workplaceLocations.find(loc => loc.id === locationId);
+    return location ? location.name : 'Unknown Location';
+  };
+
+  // Helper function to get coordinates from assigned location
+  const getLocationCoordinates = (employeeId: string): string => {
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee || !employee.currentLocationId) return 'No assignment';
+    
+    const location = workplaceLocations.find(loc => loc.id === employee.currentLocationId);
+    if (!location) return 'Unknown location';
+    
+    return `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
+  };
 
   // Summary data
   const employeeSummary = {
     totalEmployees: employees.length,
-    activeEmployees: employees.filter(emp => emp.status === 'Active').length,
-    onLeaveEmployees: employees.filter(emp => emp.status === 'On Leave').length,
-    assignedEmployees: employees.filter(emp => emp.currentAssignment?.status === 'Active').length,
+    teamLeaders: employees.filter(emp => emp.position === 'Team Leader').length,
+    epolEmployees: employees.filter(emp => emp.position === 'EPOL').length,
+    totalLocations: workplaceLocations.length,
   };
 
-  const handleAddEmployee = () => {
-    if (newEmployee.name && newEmployee.position && newEmployee.contactNumber && newEmployee.email) {
-      const employee: Employee = {
-        id: `EMP-${employees.length + 1}`,
-        name: newEmployee.name,
-        position: newEmployee.position,
-        contactNumber: newEmployee.contactNumber,
-        email: newEmployee.email,
-        status: 'Active'
-      };
-      setEmployees([...employees, employee]);
-      setNewEmployee({ name: "", position: "", contactNumber: "", email: "" });
-      setShowAddEmployeeModal(false);
-    }
-  };
 
-  const handleAssignEmployee = () => {
-    if (selectedEmployee && newAssignment.locationId && newAssignment.position && newAssignment.startDate) {
-      const location = locations.find(loc => loc.id === newAssignment.locationId);
-      if (location) {
-        const assignment: Assignment = {
-          id: `ASS-${Date.now()}`,
-          employeeId: selectedEmployee.id,
-          location: location.name,
-          position: newAssignment.position,
-          startDate: newAssignment.startDate,
-          endDate: newAssignment.endDate || undefined,
-          status: 'Active',
-          notes: newAssignment.notes
-        };
-
-        // Update employee with new assignment
-        setEmployees(employees.map(emp => 
-          emp.id === selectedEmployee.id 
-            ? { ...emp, currentAssignment: assignment }
-            : emp
-        ));
-
-        setNewAssignment({ locationId: "", position: "", startDate: "", endDate: "", notes: "" });
+  const handleAssignEmployee = async () => {
+    if (selectedEmployee && newAssignment.locationId) {
+      try {
+        await createAssignment({
+          user_id: selectedEmployee.id,
+          workplace_location_id: newAssignment.locationId
+        });
+        
+        setNewAssignment({ locationId: "" });
         setShowAssignmentModal(false);
         setSelectedEmployee(null);
+      } catch (error) {
+        console.error('Error assigning employee:', error);
+        // You might want to show a toast notification here
       }
     }
   };
 
-  const handleReassignEmployee = () => {
-    if (selectedEmployee && newAssignment.locationId && newAssignment.position && newAssignment.startDate) {
-      const location = locations.find(loc => loc.id === newAssignment.locationId);
-      if (location) {
-        // Mark current assignment as completed
-        const updatedEmployees = employees.map(emp => {
-          if (emp.id === selectedEmployee.id && emp.currentAssignment) {
-            return {
-              ...emp,
-              currentAssignment: {
-                ...emp.currentAssignment,
-                endDate: new Date().toISOString().split('T')[0],
-                status: 'Reassigned' as const
-              }
-            };
-          }
-          return emp;
-        });
-
-        // Add new assignment
-        const assignment: Assignment = {
-          id: `ASS-${Date.now()}`,
-          employeeId: selectedEmployee.id,
-          location: location.name,
-          position: newAssignment.position,
-          startDate: newAssignment.startDate,
-          endDate: newAssignment.endDate || undefined,
-          status: 'Active',
-          notes: newAssignment.notes
-        };
-
-        setEmployees(updatedEmployees.map(emp => 
-          emp.id === selectedEmployee.id 
-            ? { ...emp, currentAssignment: assignment }
-            : emp
-        ));
-
-        setNewAssignment({ locationId: "", position: "", startDate: "", endDate: "", notes: "" });
+  const handleReassignEmployee = async () => {
+    if (selectedEmployee && newAssignment.locationId) {
+      try {
+        const assignment = getAssignmentByUserId(selectedEmployee.id);
+        if (assignment) {
+          await updateAssignment(assignment.id, {
+            workplace_location_id: newAssignment.locationId
+          });
+        }
+        
+        setNewAssignment({ locationId: "" });
         setShowReassignmentModal(false);
         setSelectedEmployee(null);
+      } catch (error) {
+        console.error('Error reassigning employee:', error);
+        // You might want to show a toast notification here
       }
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Active":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "Inactive":
-        return "bg-red-100 text-red-800 border-red-200";
-      case "On Leave":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+  const handleDeleteAssignment = async () => {
+    if (selectedEmployee) {
+      try {
+        const assignment = getAssignmentByUserId(selectedEmployee.id);
+        if (assignment) {
+          await deleteAssignment(assignment.id);
+        }
+        
+        setShowDeleteModal(false);
+        setSelectedEmployee(null);
+      } catch (error) {
+        console.error('Error removing assignment:', error);
+        // You might want to show a toast notification here
+      }
     }
   };
+
+  const handleReviewRequest = (action: 'approve' | 'reject') => {
+    if (selectedEmployee) {
+      // Here you would typically send the review action to your backend
+      console.log(`Review ${action} for employee:`, selectedEmployee.name);
+      
+      // For now, just close the modal
+      setShowReassignmentModal(false);
+      setSelectedEmployee(null);
+    }
+  };
+
+
+
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Employee Management</h1>
-        <p className="text-gray-600">Manage EPOL personnel assignments and deployments</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Employee Management</h1>
+            <p className="text-gray-600">Manage EPOL personnel cleaning operation locations</p>
+          </div>
+          <Link href="/dashboard">
+            <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -321,15 +272,29 @@ export default function EmployeeManagementPage() {
           </CardContent>
         </Card>
 
+        <Card className="border-l-4 border-l-red-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 font-medium mb-1">Team Leaders</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.teamLeaders}</p>
+              </div>
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center shadow-md">
+                <User className="h-7 w-7 text-red-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="border-l-4 border-l-green-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm text-gray-600 font-medium mb-1">Active Employees</p>
-                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.activeEmployees}</p>
+                <p className="text-sm text-gray-600 font-medium mb-1">EPOL</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.epolEmployees}</p>
               </div>
               <div className="h-14 w-14 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-md">
-                <UserPlus className="h-7 w-7 text-green-600" />
+                <User className="h-7 w-7 text-green-600" />
               </div>
             </div>
           </CardContent>
@@ -339,29 +304,16 @@ export default function EmployeeManagementPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm text-gray-600 font-medium mb-1">On Leave</p>
-                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.onLeaveEmployees}</p>
+                <p className="text-sm text-gray-600 font-medium mb-1">Total Locations</p>
+                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.totalLocations}</p>
               </div>
               <div className="h-14 w-14 rounded-full bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center shadow-md">
-                <Calendar className="h-7 w-7 text-yellow-600" />
+                <MapPin className="h-7 w-7 text-yellow-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-purple-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 font-medium mb-1">Assigned</p>
-                <p className="text-3xl font-bold text-gray-900 mb-2">{employeeSummary.assignedEmployees}</p>
-              </div>
-              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md">
-                <MapPin className="h-7 w-7 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Search and Filters */}
@@ -376,7 +328,7 @@ export default function EmployeeManagementPage() {
                   placeholder="Search employees..."
                   className="pl-10 w-full border-gray-300 focus:border-red-500 focus:ring-red-500"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                 />
               </div>
               <Button 
@@ -390,111 +342,106 @@ export default function EmployeeManagementPage() {
                 onClick={() => setShowFilters(!showFilters)}
               >
                 <Filter className={`h-5 w-5 ${showFilters ? "text-white" : "text-gray-600"}`} />
+                {activeFiltersCount > 0 && (
+                  <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
+                    {activeFiltersCount}
+                  </span>
+                )}
               </Button>
               <div className="flex gap-3">
-                <Dialog open={showAddEmployeeModal} onOpenChange={setShowAddEmployeeModal}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="gap-2 border-green-300 text-green-700 hover:bg-green-50 hover:border-green-400">
-                      <Plus className="h-4 w-4" />
-                      <span>Add Employee</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px] bg-white border-gray-200 shadow-xl">
-                    <DialogHeader className="pb-4">
-                      <DialogTitle className="text-xl font-semibold text-gray-900">Add New Employee</DialogTitle>
-                      <DialogDescription className="text-gray-600">
-                        Add a new EPOL employee to the system.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-6 py-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="name" className="text-sm font-medium text-gray-700">Full Name *</Label>
-                          <Input
-                            id="name"
-                            value={newEmployee.name}
-                            onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
-                            className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                            placeholder="Enter full name"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="position" className="text-sm font-medium text-gray-700">Position *</Label>
-                          <Select value={newEmployee.position} onValueChange={(value) => setNewEmployee({ ...newEmployee, position: value })}>
-                            <SelectTrigger className="border-gray-300 focus:border-red-500 focus:ring-red-500">
-                              <SelectValue placeholder="Select position" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white border-gray-200">
-                              <SelectItem value="Environmental Officer">Environmental Officer</SelectItem>
-                              <SelectItem value="Senior Environmental Officer">Senior Environmental Officer</SelectItem>
-                              <SelectItem value="Environmental Inspector">Environmental Inspector</SelectItem>
-                              <SelectItem value="Environmental Specialist">Environmental Specialist</SelectItem>
-                              <SelectItem value="Team Leader">Team Leader</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="contact" className="text-sm font-medium text-gray-700">Contact Number *</Label>
-                          <Input
-                            id="contact"
-                            value={newEmployee.contactNumber}
-                            onChange={(e) => setNewEmployee({ ...newEmployee, contactNumber: e.target.value })}
-                            className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                            placeholder="+63 XXX XXX XXXX"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email *</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            value={newEmployee.email}
-                            onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
-                            className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                            placeholder="email@epol.gov.ph"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter className="pt-4 border-t border-gray-200">
-                      <Button variant="outline" onClick={() => setShowAddEmployeeModal(false)} className="border-gray-300 hover:bg-gray-50">
-                        Cancel
-                      </Button>
-                      <Button 
-                        onClick={handleAddEmployee} 
-                        disabled={!newEmployee.name || !newEmployee.position || !newEmployee.contactNumber || !newEmployee.email}
-                        className="bg-red-600 hover:bg-red-700 text-white"
-                      >
-                        Add Employee
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                <Link href="/dashboard/employees/locations">
+                  <Button className="gap-2 bg-blue-600 text-white hover:bg-blue-700 shadow-md">
+                    <MapPin className="h-4 w-4" />
+                    <span>Workplace Locations</span>
+                  </Button>
+                </Link>
+                <Link href="/dashboard/employees/review-requests">
+                  <Button className="gap-2 bg-orange-600 text-white hover:bg-orange-700 shadow-md">
+                    <UserCheck className="h-4 w-4" />
+                    <span>Reassignment/Redeployment Requests</span>
+                    <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-600 text-xs font-semibold rounded-full">
+                      {getPendingCount()}
+                    </span>
+                  </Button>
+                </Link>
               </div>
             </div>
 
             {showFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+              <div className="space-y-6 pt-4 border-t border-gray-200">
                 <div>
-                  <h3 className="text-sm font-semibold mb-3 text-gray-700">Status</h3>
+                  <h3 className="text-sm font-semibold mb-3 text-gray-700">Position</h3>
                   <div className="flex flex-wrap gap-2">
-                    {["Active", "Inactive", "On Leave"].map((status) => (
+                    {["Team Leader", "EPOL"].map((position) => (
                       <Button
-                        key={status}
-                        variant={selectedStatus === status ? "default" : "outline"}
+                        key={position}
+                        variant={selectedPosition === position ? "default" : "outline"}
                         size="sm"
-                        className={`${getStatusColor(status)} ${selectedStatus === status ? "ring-2 ring-offset-2 ring-red-500 shadow-md" : "border-gray-300 hover:bg-gray-50"}`}
-                        onClick={() => setSelectedStatus(selectedStatus === status ? null : status)}
+                        className={`${
+                          position === "Team Leader" 
+                            ? selectedPosition === position 
+                              ? "bg-red-600 text-white hover:bg-red-700 ring-2 ring-offset-2 ring-red-500 shadow-md" 
+                              : "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
+                            : selectedPosition === position 
+                              ? "bg-green-600 text-white hover:bg-green-700 ring-2 ring-offset-2 ring-green-500 shadow-md" 
+                              : "bg-green-100 text-green-700 hover:bg-green-200 border-green-200"
+                        }`}
+                        onClick={() => handlePositionChange(selectedPosition === position ? null : position)}
                       >
-                        {status}
+                        {position}
+                        {selectedPosition === position && <X className="ml-1 h-3 w-3" />}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 text-gray-700">Location</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      "Baclaran (Proper)",
+                      "Baclaran (Mabuhay)",
+                      "Banay Banay (Proper)",
+                      "Banay Banay (NIA)",
+                      "Banlic",
+                      "Bigaa",
+                      "Butong",
+                      "Casile",
+                      "Diezmo",
+                      "Gulod",
+                      "Mamatid (Mabuhay)",
+                      "Mamatid (Proper)",
+                      "Marinig (Proper)",
+                      "Marinig - SV",
+                      "Niugan (Proper)",
+                      "Niugan - SV",
+                      "Pittland",
+                      "POB 1",
+                      "POB 2",
+                      "POB 3",
+                      "Pulo",
+                      "Sala",
+                      "San Isidro"
+                    ].map((location) => (
+                      <Button
+                        key={location}
+                        variant={selectedLocation === location ? "default" : "outline"}
+                        size="sm"
+                        className={`whitespace-nowrap ${
+                          selectedLocation === location 
+                            ? "bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-offset-2 ring-blue-500 shadow-md" 
+                            : "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"
+                        }`}
+                        onClick={() => handleLocationChange(selectedLocation === location ? null : location)}
+                      >
+                        {location}
+                        {selectedLocation === location && <X className="ml-1 h-3 w-3" />}
                       </Button>
                     ))}
                   </div>
                 </div>
               </div>
             )}
+
           </div>
         </CardContent>
       </Card>
@@ -509,7 +456,7 @@ export default function EmployeeManagementPage() {
             <div>
               <CardTitle className="text-xl text-gray-900">EPOL Employees</CardTitle>
               <CardDescription className="text-base text-gray-600">
-                {filteredEmployees.length} employees • Manage employee assignments and deployments
+                {employeeSummary.totalEmployees} employees • Manage employee assignments and deployments
               </CardDescription>
             </div>
           </div>
@@ -520,22 +467,16 @@ export default function EmployeeManagementPage() {
               <thead className="bg-gray-50">
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
-                    Employee ID
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
-                    Name
+                    Employee
                   </th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
                     Position
                   </th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
-                    Contact
+                    Current Assignment/Deployment
                   </th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
-                    Current Assignment
+                    Coordinates
                   </th>
                   <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
                     Actions
@@ -543,46 +484,58 @@ export default function EmployeeManagementPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredEmployees.length > 0 ? filteredEmployees.map((employee) => (
+                {paginatedEmployees.length > 0 ? paginatedEmployees.map((employee) => (
                   <tr key={employee.id} className="hover:bg-gray-50 transition-colors duration-150">
                     <td className="py-4 px-6">
-                      <div className="font-semibold text-gray-900">{employee.id}</div>
+                      <div className="space-y-1">
+                        <div className="font-semibold text-gray-900">{employee.name}</div>
+                        <div className="text-sm text-gray-500">ID: {employee.id}</div>
+                      </div>
                     </td>
                     <td className="py-4 px-6">
-                      <div className="font-semibold text-gray-900">{employee.name}</div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="font-medium text-gray-900">{employee.position}</span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="font-medium text-gray-900">{employee.contactNumber}</span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span
-                        className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusColor(employee.status)}`}
-                      >
-                        {employee.status}
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
+                        employee.position === "Team Leader" 
+                          ? "bg-red-100 text-red-800 border border-red-200" 
+                          : "bg-green-100 text-green-800 border border-green-200"
+                      }`}>
+                        {employee.position}
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      {employee.currentAssignment ? (
-                        <div className="space-y-1">
-                          <div className="text-sm font-medium text-gray-900">{employee.currentAssignment.location}</div>
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            employee.currentAssignment.status === 'Active' 
-                              ? "bg-green-100 text-green-800" 
-                              : "bg-gray-100 text-gray-800"
-                          }`}>
-                            {employee.currentAssignment.status}
-                          </span>
+                      {employee.currentLocationId ? (
+                        <div className="text-sm font-medium text-gray-900">
+                          {(() => {
+                            const location = workplaceLocations.find(loc => loc.id === employee.currentLocationId);
+                            console.log('Looking for location ID:', employee.currentLocationId, 'Available locations:', workplaceLocations.map(l => ({ id: l.id, name: l.name })), 'Found:', location);
+                            return location?.name || "Unknown Location";
+                          })()}
                         </div>
                       ) : (
                         <span className="text-gray-500 text-sm">No assignment</span>
                       )}
                     </td>
                     <td className="py-4 px-6">
+                      {(() => {
+                        // If no assignment, no coordinates
+                        if (!employee.currentLocationId) {
+                          return <span className="text-gray-500 text-sm">No assignment</span>;
+
+                        }
+                        
+                        // If has assignment, show coordinates from workplace location
+                        const coordinates = getLocationCoordinates(employee.id);
+                        return coordinates === 'No assignment' || coordinates === 'Unknown location' ? (
+                          <span className="text-gray-500 text-sm">{coordinates}</span>
+                        ) : (
+                          <div className="text-xs text-gray-600 font-mono">
+                            {coordinates}
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="py-4 px-6">
                       <div className="flex items-center gap-2">
-                        {!employee.currentAssignment || employee.currentAssignment.status !== 'Active' ? (
+                        {!employee.currentLocationId ? (
                           <Button
                             variant="default"
                             size="sm"
@@ -596,25 +549,39 @@ export default function EmployeeManagementPage() {
                             Assign
                           </Button>
                         ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-3 border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 shadow-sm"
-                            onClick={() => {
-                              setSelectedEmployee(employee);
-                              setShowReassignmentModal(true);
-                            }}
-                          >
-                            <Edit className="h-3.5 w-3.5 mr-1" />
-                            Reassign
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                              onClick={() => {
+                                setSelectedEmployee(employee);
+                                setShowReassignmentModal(true);
+                              }}
+                            >
+                              <Edit className="h-3.5 w-3.5 mr-1" />
+                              Reassign
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-8 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm"
+                              onClick={() => {
+                                setSelectedEmployee(employee);
+                                setShowDeleteModal(true);
+                              }}
+                            >
+                              <X className="h-3.5 w-3.5 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={7} className="py-12 px-6 text-center">
+                    <td colSpan={5} className="py-12 px-6 text-center">
                       <div className="flex flex-col items-center gap-4">
                         <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
                           <Users className="h-8 w-8 text-gray-400" />
@@ -630,6 +597,54 @@ export default function EmployeeManagementPage() {
               </tbody>
             </table>
           </div>
+          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+            <div className="text-sm text-gray-600 font-medium">
+              {filteredEmployees.length > 0 
+                ? `Showing ${startIndex + 1}-${Math.min(endIndex, filteredEmployees.length)} of ${filteredEmployees.length} records`
+                : `Showing 0 of 0 records`
+              }
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1 || filteredEmployees.length === 0}
+                className="h-9 px-4 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.max(1, totalPages) }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    disabled={totalPages === 1 || filteredEmployees.length === 0}
+                    className={`h-9 w-9 p-0 font-semibold ${
+                      currentPage === page 
+                        ? "bg-red-600 hover:bg-red-700 text-white shadow-md" 
+                        : "border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages || filteredEmployees.length === 0}
+                className="h-9 px-4 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -642,69 +657,24 @@ export default function EmployeeManagementPage() {
               Assign Employee
             </DialogTitle>
             <DialogDescription className="text-gray-600">
-              Assign {selectedEmployee?.name} to a new location and position.
+              Assign {selectedEmployee?.name} to a new location.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="location" className="text-sm font-medium text-gray-700">Location *</Label>
-                <Select value={newAssignment.locationId} onValueChange={(value) => setNewAssignment({ ...newAssignment, locationId: value })}>
-                  <SelectTrigger className="border-gray-300 focus:border-red-500 focus:ring-red-500">
-                    <SelectValue placeholder="Select location" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-gray-200">
-                    {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {location.name} ({location.currentStaff}/{location.capacity})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="position" className="text-sm font-medium text-gray-700">Position *</Label>
-                <Input
-                  id="position"
-                  value={newAssignment.position}
-                  onChange={(e) => setNewAssignment({ ...newAssignment, position: e.target.value })}
-                  className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                  placeholder="Enter position"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate" className="text-sm font-medium text-gray-700">Start Date *</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={newAssignment.startDate}
-                  onChange={(e) => setNewAssignment({ ...newAssignment, startDate: e.target.value })}
-                  className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="endDate" className="text-sm font-medium text-gray-700">End Date</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={newAssignment.endDate}
-                  onChange={(e) => setNewAssignment({ ...newAssignment, endDate: e.target.value })}
-                  className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                />
-              </div>
-            </div>
             <div className="space-y-2">
-              <Label htmlFor="notes" className="text-sm font-medium text-gray-700">Notes</Label>
-              <Textarea
-                id="notes"
-                value={newAssignment.notes}
-                onChange={(e) => setNewAssignment({ ...newAssignment, notes: e.target.value })}
-                className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                placeholder="Additional notes about this assignment"
-                rows={3}
-              />
+              <Label htmlFor="location" className="text-sm font-medium text-gray-700">Location *</Label>
+              <Select value={newAssignment.locationId} onValueChange={(value) => setNewAssignment({ ...newAssignment, locationId: value })}>
+                <SelectTrigger className="border-gray-300 focus:border-red-500 focus:ring-red-500">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200">
+                  {workplaceLocations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter className="pt-4 border-t border-gray-200">
@@ -713,7 +683,7 @@ export default function EmployeeManagementPage() {
             </Button>
             <Button 
               onClick={handleAssignEmployee} 
-              disabled={!newAssignment.locationId || !newAssignment.position || !newAssignment.startDate}
+              disabled={!newAssignment.locationId}
               className="bg-green-600 hover:bg-green-700 text-white"
             >
               Assign Employee
@@ -731,69 +701,24 @@ export default function EmployeeManagementPage() {
               Reassign Employee
             </DialogTitle>
             <DialogDescription className="text-gray-600">
-              Reassign {selectedEmployee?.name} to a new location and position.
+              Reassign {selectedEmployee?.name} to a new location.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="location" className="text-sm font-medium text-gray-700">New Location *</Label>
-                <Select value={newAssignment.locationId} onValueChange={(value) => setNewAssignment({ ...newAssignment, locationId: value })}>
-                  <SelectTrigger className="border-gray-300 focus:border-red-500 focus:ring-red-500">
-                    <SelectValue placeholder="Select location" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-gray-200">
-                    {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {location.name} ({location.currentStaff}/{location.capacity})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="position" className="text-sm font-medium text-gray-700">New Position *</Label>
-                <Input
-                  id="position"
-                  value={newAssignment.position}
-                  onChange={(e) => setNewAssignment({ ...newAssignment, position: e.target.value })}
-                  className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                  placeholder="Enter position"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate" className="text-sm font-medium text-gray-700">Start Date *</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={newAssignment.startDate}
-                  onChange={(e) => setNewAssignment({ ...newAssignment, startDate: e.target.value })}
-                  className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="endDate" className="text-sm font-medium text-gray-700">End Date</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={newAssignment.endDate}
-                  onChange={(e) => setNewAssignment({ ...newAssignment, endDate: e.target.value })}
-                  className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                />
-              </div>
-            </div>
             <div className="space-y-2">
-              <Label htmlFor="notes" className="text-sm font-medium text-gray-700">Notes</Label>
-              <Textarea
-                id="notes"
-                value={newAssignment.notes}
-                onChange={(e) => setNewAssignment({ ...newAssignment, notes: e.target.value })}
-                className="border-gray-300 focus:border-red-500 focus:ring-red-500"
-                placeholder="Reason for reassignment"
-                rows={3}
-              />
+              <Label htmlFor="location" className="text-sm font-medium text-gray-700">New Location *</Label>
+              <Select value={newAssignment.locationId} onValueChange={(value) => setNewAssignment({ ...newAssignment, locationId: value })}>
+                <SelectTrigger className="border-gray-300 focus:border-red-500 focus:ring-red-500">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200">
+                  {workplaceLocations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter className="pt-4 border-t border-gray-200">
@@ -802,7 +727,7 @@ export default function EmployeeManagementPage() {
             </Button>
             <Button 
               onClick={handleReassignEmployee} 
-              disabled={!newAssignment.locationId || !newAssignment.position || !newAssignment.startDate}
+              disabled={!newAssignment.locationId}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               Reassign Employee
@@ -810,6 +735,55 @@ export default function EmployeeManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Assignment Confirmation Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="sm:max-w-[500px] bg-white border-gray-200 shadow-xl">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <X className="h-5 w-5 text-red-600" />
+              Remove Location Assignment
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Are you sure you want to remove the location assignment for {selectedEmployee?.name}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <X className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Warning
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>This will remove the employee's current location assignment. They will appear as "No assignment" in the system.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="pt-4 border-t border-gray-200">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteModal(false)} 
+              className="border-gray-300 hover:bg-gray-50"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDeleteAssignment}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Remove Assignment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
+

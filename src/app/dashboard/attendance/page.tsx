@@ -21,8 +21,10 @@ import {
   Settings,
   User,
   Shield,
+  FileText,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ArrowLeft
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo, useEffect } from "react";
@@ -33,6 +35,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { generateAttendancePDF } from "@/utils/attendancePdfExport";
 import { EmployeeAttendanceModal } from "@/components/ui/EmployeeAttendanceModal";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import Link from "next/link";
+import { attendanceRecords } from "@/data/attendanceData";
 
 // Helper function to calculate hours rendered
 function getHoursRendered(record: any) {
@@ -175,7 +179,7 @@ function getPositionColor(position: string) {
     case "Team Leader":
       return "bg-blue-100 text-blue-800";
     case "EPOL":
-      return "bg-purple-100 text-purple-800";
+      return "bg-green-100 text-green-800";
     default:
       return "bg-gray-100 text-gray-800";
   }
@@ -186,40 +190,20 @@ export default function AttendanceRecordsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [isExporting, setIsExporting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<{ name: string; position: string } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<number | null>(null);
+  const [showValidationModal, setShowValidationModal] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Mock data for demonstration with updated schedule
-  const [attendanceRecords, setAttendanceRecords] = useState([
-    { id: 1, name: "John Doe", position: "Admin", date: "2023-04-19", clockIn: "02:30:45 PM", clockOut: "06:30:00 PM", status: "Present" },
-    { id: 2, name: "Jane Smith", position: "Team Leader", date: "2023-04-19", clockIn: "02:20:30 PM", clockOut: "06:30:00 PM", status: "Present" },
-    { id: 3, name: "Alex Johnson", position: "EPOL", date: "2023-04-19", clockIn: "02:45:12 PM", clockOut: "06:30:00 PM", status: "Present" },
-    { id: 4, name: "Sam Williams", position: "EPOL", date: "2023-04-19", clockIn: "03:10:45 PM", clockOut: null, status: "Present" },
-    { id: 5, name: "Taylor Brown", position: "Team Leader", date: "2023-04-19", clockIn: null, clockOut: null, status: "Absent" },
-    { id: 6, name: "Jordan Lee", position: "EPOL", date: "2023-04-18", clockIn: "02:25:18 PM", clockOut: "06:30:00 PM", status: "Present" },
-    { id: 7, name: "Casey Green", position: "EPOL", date: "2023-04-18", clockIn: "03:00:33 PM", clockOut: "06:30:00 PM", status: "Present" },
-    { id: 8, name: "Riley White", position: "Team Leader", date: "2023-04-18", clockIn: "02:05:12 PM", clockOut: "06:30:00 PM", status: "Present" },
-    { id: 9, name: "Michael Chen", position: "EPOL", date: "2023-04-18", clockIn: "03:30:00 PM", clockOut: "06:30:00 PM", status: "Present" },
-    { id: 10, name: "Sarah Wilson", position: "EPOL", date: "2023-04-18", clockIn: "03:45:00 PM", clockOut: "06:30:00 PM", status: "Present" },
-    { id: 11, name: "David Martinez", position: "EPOL", date: "2023-04-17", clockIn: "02:15:20 PM", clockOut: "06:15:00 PM", status: "Present" },
-    { id: 12, name: "Lisa Anderson", position: "Admin", date: "2023-04-17", clockIn: "02:35:45 PM", clockOut: "06:45:00 PM", status: "Present" },
-    { id: 13, name: "Robert Taylor", position: "EPOL", date: "2023-04-17", clockIn: "03:20:10 PM", clockOut: "06:30:00 PM", status: "Present" },
-    { id: 14, name: "Maria Garcia", position: "Team Leader", date: "2023-04-17", clockIn: "02:50:30 PM", clockOut: "06:20:00 PM", status: "Present" },
-    { id: 15, name: "James Wilson", position: "EPOL", date: "2023-04-17", clockIn: null, clockOut: null, status: "Absent" },
-    { id: 16, name: "Jennifer Davis", position: "EPOL", date: "2023-04-16", clockIn: "02:40:15 PM", clockOut: "06:35:00 PM", status: "Present" },
-    { id: 17, name: "Christopher Brown", position: "Team Leader", date: "2023-04-16", clockIn: "02:25:50 PM", clockOut: "06:25:00 PM", status: "Present" },
-    { id: 18, name: "Amanda Miller", position: "EPOL", date: "2023-04-16", clockIn: "03:15:25 PM", clockOut: "06:40:00 PM", status: "Present" },
-    { id: 19, name: "Daniel Rodriguez", position: "EPOL", date: "2023-04-16", clockIn: "02:55:40 PM", clockOut: "06:15:00 PM", status: "Present" },
-    { id: 20, name: "Michelle Thompson", position: "Admin", date: "2023-04-16", clockIn: "02:30:00 PM", clockOut: "06:30:00 PM", status: "Present" },
-  ]);
+  // Use shared attendance data
+  const [attendanceRecordsState, setAttendanceRecordsState] = useState(attendanceRecords);
 
   // Get unique positions and statuses for filter options
   const positions = useMemo(() => 
@@ -228,13 +212,13 @@ export default function AttendanceRecordsPage() {
   );
 
   const statuses = useMemo(() => 
-    Array.from(new Set(attendanceRecords.map(record => getAttendanceStatus(record)))),
-    [attendanceRecords]
+    Array.from(new Set(attendanceRecordsState.map(record => getAttendanceStatus(record)))),
+    [attendanceRecordsState]
   );
 
   // Filter records based on search query and selected filters
   const filteredRecords = useMemo(() => {
-    return attendanceRecords.filter(record => {
+    return attendanceRecordsState.filter(record => {
       const matchesSearch = !searchQuery || 
         record.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         record.position.toLowerCase().includes(searchQuery.toLowerCase());
@@ -254,7 +238,7 @@ export default function AttendanceRecordsPage() {
       
       return matchesSearch && matchesPosition && matchesStatus && matchesDate;
     });
-  }, [attendanceRecords, searchQuery, selectedPosition, selectedStatus, selectedDate]);
+  }, [attendanceRecordsState, searchQuery, selectedPosition, selectedStatus, selectedDate]);
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
@@ -269,7 +253,7 @@ export default function AttendanceRecordsPage() {
 
   // Filter records for selected employee
   const selectedEmployeeRecords = selectedEmployee
-    ? attendanceRecords.filter((rec) => rec.name === selectedEmployee.name)
+    ? attendanceRecordsState.filter((rec) => rec.name === selectedEmployee.name)
     : [];
 
   const handleExportPDF = async () => {
@@ -292,7 +276,7 @@ export default function AttendanceRecordsPage() {
   const confirmDelete = () => {
     if (recordToDelete) {
       // Remove the record from the state
-      setAttendanceRecords(prevRecords => 
+      setAttendanceRecordsState(prevRecords => 
         prevRecords.filter(record => record.id !== recordToDelete)
       );
       // Close the modal and reset the record to delete
@@ -305,18 +289,28 @@ export default function AttendanceRecordsPage() {
 
   // Calculate summary statistics
   const attendanceSummary = {
-    totalRecords: attendanceRecords.length,
-    presentCount: attendanceRecords.filter(record => getAttendanceStatus(record) === "Present").length,
-    absentCount: attendanceRecords.filter(record => getAttendanceStatus(record) === "Absent").length,
-    lateCount: attendanceRecords.filter(record => getAttendanceStatus(record) === "Late").length,
-    undertimeCount: attendanceRecords.filter(record => getAttendanceStatus(record) === "Undertime").length,
+    totalRecords: attendanceRecordsState.length,
+    presentCount: attendanceRecordsState.filter(record => getAttendanceStatus(record) === "Present").length,
+    absentCount: attendanceRecordsState.filter(record => getAttendanceStatus(record) === "Absent").length,
+    lateCount: attendanceRecordsState.filter(record => getAttendanceStatus(record) === "Late").length,
+    undertimeCount: attendanceRecordsState.filter(record => getAttendanceStatus(record) === "Undertime").length,
   };
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Attendance Records</h1>
-        <p className="text-gray-500">View and manage staff attendance records</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Attendance Records</h1>
+            <p className="text-gray-500">View and manage staff attendance records</p>
+          </div>
+          <Link href="/dashboard">
+            <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Attendance Summary Cards */}
@@ -392,94 +386,135 @@ export default function AttendanceRecordsPage() {
         </Card>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-4">
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              type="search"
-              placeholder="Search records..."
-              className="pl-8 w-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+      {/* Search and Filters */}
+      <Card className="mb-6 bg-white shadow-md border-gray-200">
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                <Input
+                  type="search"
+                  placeholder="Search records..."
+                  className="pl-10 w-full border-gray-300 focus:border-red-500 focus:ring-red-500"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Popover open={showFilters} onOpenChange={setShowFilters}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant={showFilters ? "default" : "outline"}
+                    size="icon" 
+                    className={`h-11 w-11 relative transition-all duration-200 ${
+                      showFilters 
+                        ? "bg-red-600 text-white hover:bg-red-700 shadow-md" 
+                        : "border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+                    }`}
+                    onClick={() => setShowFilters(!showFilters)}
+                  >
+                    <Filter className={`h-5 w-5 ${showFilters ? "text-white" : "text-gray-600"}`} />
+                    {hasActiveFilters && (
+                      <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
+                        {[selectedPosition, selectedStatus].filter(Boolean).length}
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 bg-white z-50 shadow-lg border">
+                  <div className="font-semibold mb-2">Position</div>
+                  <div className="flex gap-2 mb-4 flex-wrap">
+                    {positions.map((position) => (
+                      <Button
+                        key={position}
+                        variant={selectedPosition === position ? "default" : "outline"}
+                        size="sm"
+                        className={`${
+                          position === "Admin" 
+                            ? selectedPosition === position 
+                              ? "bg-red-600 text-white hover:bg-red-700 ring-2 ring-offset-2 ring-red-500 shadow-md" 
+                              : "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
+                            : position === "Team Leader"
+                            ? selectedPosition === position 
+                              ? "bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-offset-2 ring-blue-500 shadow-md" 
+                              : "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"
+                            : selectedPosition === position 
+                              ? "bg-green-600 text-white hover:bg-green-700 ring-2 ring-offset-2 ring-green-500 shadow-md" 
+                              : "bg-green-100 text-green-700 hover:bg-green-200 border-green-200"
+                        }`}
+                        onClick={() => setSelectedPosition(selectedPosition === position ? null : position)}
+                      >
+                        {position}
+                        {selectedPosition === position && <X className="ml-1 h-3 w-3" />}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="font-semibold mb-2">Status</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {statuses.map((status) => (
+                      <Button
+                        key={status}
+                        variant={selectedStatus === status ? "default" : "outline"}
+                        size="sm"
+                        className={`${
+                          status === "Present" 
+                            ? selectedStatus === status 
+                              ? "bg-green-600 text-white hover:bg-green-700 ring-2 ring-offset-2 ring-green-500 shadow-md" 
+                              : "bg-green-100 text-green-700 hover:bg-green-200 border-green-200"
+                            : status === "Absent"
+                            ? selectedStatus === status 
+                              ? "bg-red-600 text-white hover:bg-red-700 ring-2 ring-offset-2 ring-red-500 shadow-md" 
+                              : "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
+                            : status === "Late"
+                            ? selectedStatus === status 
+                              ? "bg-yellow-600 text-white hover:bg-yellow-700 ring-2 ring-offset-2 ring-yellow-500 shadow-md" 
+                              : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200"
+                            : selectedStatus === status 
+                              ? "bg-orange-600 text-white hover:bg-orange-700 ring-2 ring-offset-2 ring-orange-500 shadow-md" 
+                              : "bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200"
+                        }`}
+                        onClick={() => setSelectedStatus(selectedStatus === status ? null : status)}
+                      >
+                        {status}
+                        {selectedStatus === status && <X className="ml-1 h-3 w-3" />}
+                      </Button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <div className="flex gap-2 items-center">
+                <SingleDatePicker value={selectedDate} onChange={setSelectedDate} />
+                <Button 
+                  variant="outline" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 flex gap-2 items-center"
+                  onClick={() => setShowValidationModal(true)}
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>EPOL Validation</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="bg-black hover:bg-gray-800 text-white border-black hover:border-gray-800 flex gap-2 items-center"
+                  onClick={handleExportPDF}
+                  disabled={isExporting || filteredRecords.length === 0}
+                >
+                  {isExporting ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      <span>Export</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
-          <Popover open={showFilters} onOpenChange={setShowFilters}>
-            <PopoverTrigger asChild>
-              <Button 
-                variant={showFilters ? "default" : "outline"}
-                size="icon" 
-                className={`h-10 w-10 relative transition-all duration-200 ${
-                  showFilters 
-                    ? "bg-red-600 text-white hover:bg-red-700 shadow-md" 
-                    : "hover:bg-gray-100"
-                }`}
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className={`h-4 w-4 ${showFilters ? "text-white" : "text-gray-500"}`} />
-                {hasActiveFilters && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm">
-                    {[selectedPosition, selectedStatus].filter(Boolean).length}
-                  </span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 bg-white z-50 shadow-lg border">
-              <div className="font-semibold mb-2">Position</div>
-              <div className="flex gap-2 mb-4 flex-wrap">
-                {positions.map((position) => (
-                  <Button
-                    key={position}
-                    variant={selectedPosition === position ? "default" : "outline"}
-                    size="sm"
-                    className={`${getPositionColor(position)} ${selectedPosition === position ? "ring-2 ring-offset-2" : ""}`}
-                    onClick={() => setSelectedPosition(selectedPosition === position ? null : position)}
-                  >
-                    {position}
-                    {selectedPosition === position && <X className="ml-1 h-3 w-3" />}
-                  </Button>
-                ))}
-              </div>
-              <div className="font-semibold mb-2">Status</div>
-              <div className="flex gap-2 flex-wrap">
-                {statuses.map((status) => (
-                  <Button
-                    key={status}
-                    variant={selectedStatus === status ? "default" : "outline"}
-                    size="sm"
-                    className={`${getStatusColor(status)} ${selectedStatus === status ? "ring-2 ring-offset-2" : ""}`}
-                    onClick={() => setSelectedStatus(selectedStatus === status ? null : status)}
-                  >
-                    {status}
-                    {selectedStatus === status && <X className="ml-1 h-3 w-3" />}
-                  </Button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-        <div className="flex gap-2 items-start">
-          <SingleDatePicker value={selectedDate} onChange={setSelectedDate} />
-          <Button 
-            variant="outline" 
-            className="bg-black hover:bg-gray-800 text-white border-black hover:border-gray-800 flex gap-2 items-center"
-            onClick={handleExportPDF}
-            disabled={isExporting || filteredRecords.length === 0}
-          >
-            {isExporting ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                <span>Exporting...</span>
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4" />
-                <span>Export</span>
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-l-4 border-l-red-500 bg-white shadow-lg">
         <CardHeader className="bg-gradient-to-r from-red-50 to-red-100 rounded-t-lg border-b border-red-200">
@@ -539,7 +574,11 @@ export default function AttendanceRecordsPage() {
                         <div className="text-sm text-gray-500">ID: {record.id}</div>
                       </td>
                       <td className="py-4 px-6">
-                        <span className="font-medium text-gray-900">{record.position}</span>
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getPositionColor(record.position)}`}
+                        >
+                          {record.position}
+                        </span>
                       </td>
                       <td className="py-4 px-6">
                         <span className="font-medium text-gray-900">{record.date}</span>
@@ -673,7 +712,7 @@ export default function AttendanceRecordsPage() {
         onClose={() => setModalOpen(false)}
         employeeName={selectedEmployee?.name || ""}
         employeePosition={selectedEmployee?.position || ""}
-        attendanceRecords={attendanceRecords}
+        attendanceRecords={attendanceRecordsState}
       />
 
       {/* Delete Confirmation Modal */}
@@ -698,6 +737,180 @@ export default function AttendanceRecordsPage() {
               className="bg-red-600 hover:bg-red-700 text-white shadow-sm border border-red-600 hover:border-red-700"
             >
               Delete Record
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* EPOL Validation Modal */}
+      <Dialog open={showValidationModal} onOpenChange={setShowValidationModal}>
+        <DialogContent className="sm:max-w-[800px] bg-white border-gray-200 shadow-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              EPOL Validation Records
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              View today's validation remarks and evidence photos submitted by team leaders for street sweepers attendance.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Current date validation data - filtered to show only team leader validations for street sweepers */}
+            <div className="space-y-4">
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
+                      <span className="text-white font-semibold text-sm">JD</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">John Doe</h3>
+                      <p className="text-sm text-gray-600">Street Sweeper</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-gray-500">{new Date().toLocaleDateString()} 2:30 PM</span>
+                    <p className="text-xs text-red-600 font-medium">
+                      {(() => {
+                        try {
+                          // In real implementation, this would get the validator name from the validation data
+                          const validatorName = null; // This would come from your backend/AsyncStorage
+                          if (validatorName) {
+                            return `Validated by ${validatorName}`;
+                          } else {
+                            throw new Error('Validator name not found');
+                          }
+                        } catch (error) {
+                          return 'Coconnect pa';
+                        }
+                      })()}
+                    </p>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <h4 className="font-medium text-gray-900 mb-2">Validation Remarks:</h4>
+                  <p className="text-sm text-gray-700 bg-white p-3 rounded border">
+                    Street sweeper arrived on time and completed assigned route. All designated areas were properly cleaned. 
+                    Equipment was used correctly and safety protocols were followed. No issues observed during validation.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Evidence Photo:</h4>
+                  <div className="flex justify-center">
+                    <div className="bg-gray-200 rounded-lg p-4 text-center w-32">
+                      <div className="h-20 w-full bg-gray-300 rounded flex items-center justify-center">
+                        <span className="text-gray-500 text-sm">Photo</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">Work hours evidence</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-green-600 flex items-center justify-center">
+                      <span className="text-white font-semibold text-sm">SW</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Sam Williams</h3>
+                      <p className="text-sm text-gray-600">Street Sweeper</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-gray-500">{new Date().toLocaleDateString()} 3:45 PM</span>
+                    <p className="text-xs text-red-600 font-medium">
+                      {(() => {
+                        try {
+                          // In real implementation, this would get the validator name from the validation data
+                          const validatorName = null; // This would come from your backend/AsyncStorage
+                          if (validatorName) {
+                            return `Validated by ${validatorName}`;
+                          } else {
+                            throw new Error('Validator name not found');
+                          }
+                        } catch (error) {
+                          return 'Coconnect pa';
+                        }
+                      })()}
+                    </p>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <h4 className="font-medium text-gray-900 mb-2">Validation Remarks:</h4>
+                  <p className="text-sm text-gray-700 bg-white p-3 rounded border">
+                    Street sweeper performed excellent work on assigned route. All debris was properly collected and disposed of. 
+                    Work quality exceeded expectations. Safety equipment was properly worn throughout the shift.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Evidence Photo:</h4>
+                  <div className="flex justify-center">
+                    <div className="bg-gray-200 rounded-lg p-4 text-center w-32">
+                      <div className="h-20 w-full bg-gray-300 rounded flex items-center justify-center">
+                        <span className="text-gray-500 text-sm">Photo</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">Work hours evidence</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-orange-600 flex items-center justify-center">
+                      <span className="text-white font-semibold text-sm">TB</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Taylor Brown</h3>
+                      <p className="text-sm text-gray-600">Street Sweeper</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-gray-500">{new Date().toLocaleDateString()} 4:20 PM</span>
+                    <p className="text-xs text-red-600 font-medium">
+                      {(() => {
+                        try {
+                          // In real implementation, this would get the validator name from the validation data
+                          const validatorName = null; // This would come from your backend/AsyncStorage
+                          if (validatorName) {
+                            return `Validated by ${validatorName}`;
+                          } else {
+                            throw new Error('Validator name not found');
+                          }
+                        } catch (error) {
+                          return 'Coconnect pa';
+                        }
+                      })()}
+                    </p>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <h4 className="font-medium text-gray-900 mb-2">Validation Remarks:</h4>
+                  <p className="text-sm text-gray-700 bg-white p-3 rounded border">
+                    Street sweeper completed assigned tasks efficiently. Work area was left clean and organized. 
+                    All safety protocols were followed correctly. Minor improvement needed in time management.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Evidence Photo:</h4>
+                  <div className="flex justify-center">
+                    <div className="bg-gray-200 rounded-lg p-4 text-center w-32">
+                      <div className="h-20 w-full bg-gray-300 rounded flex items-center justify-center">
+                        <span className="text-gray-500 text-sm">Photo</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">Work hours evidence</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="pt-4 border-t border-gray-200">
+            <Button variant="outline" onClick={() => setShowValidationModal(false)} className="bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

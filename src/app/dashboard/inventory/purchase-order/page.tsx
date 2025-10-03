@@ -33,10 +33,27 @@ export default function PurchaseOrderPage() {
   });
   
   // Get completed orders
-  const completedOrders = purchaseOrders.filter(order => order.status === "Completed");
+  const completedOrders = purchaseOrders.filter(order => order.status === "completed");
   
-  // Suggested items (low stock + out of stock)
-  const suggestedItems = [...getLowStockItems(), ...getOutOfStockItems()];
+  // State for suggested items
+  const [suggestedItems, setSuggestedItems] = useState<InventoryItem[]>([]);
+  
+  // Load suggested items on component mount
+  useEffect(() => {
+    const loadSuggestedItems = async () => {
+      try {
+        const [lowStockItems, outOfStockItems] = await Promise.all([
+          getLowStockItems(),
+          getOutOfStockItems()
+        ]);
+        setSuggestedItems([...lowStockItems, ...outOfStockItems]);
+      } catch (error) {
+        console.error('Error loading suggested items:', error);
+      }
+    };
+    
+    loadSuggestedItems();
+  }, [getLowStockItems, getOutOfStockItems]);
   
   // Handle adding an item to the order
   const handleAddItem = () => {
@@ -74,7 +91,7 @@ export default function PurchaseOrderPage() {
   };
   
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Reset validation errors
@@ -105,14 +122,18 @@ export default function PurchaseOrderPage() {
     
     setIsSubmitting(true);
     try {
-      const newOrder: Omit<PurchaseOrder, "id"> = {
-        orderDate: new Date().toISOString().split('T')[0],
-        createdBy: "Current User",
-        items: items,
-        status: "Pending",
+      // Transform items to match API format
+      const apiItems = items.map(item => ({
+        inventory_item_id: parseInt(item.itemId),
+        quantity: item.quantity,
+        unit_price: 0 // Default price, should be set by admin
+      }));
+
+      const orderId = await createPurchaseOrder({
+        items: apiItems,
         notes: reason
-      };
-      const orderId = createPurchaseOrder(newOrder);
+      });
+      
       setLastOrderId(orderId);
       setShowSuccessModal(true);
       setItems([]);
@@ -132,12 +153,12 @@ export default function PurchaseOrderPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Purchase Order Request</h1>
-          <p className="text-gray-500">Request new inventory items from City Hall</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Create Purchase Order Request</h1>
+          <p className="text-gray-500">Request new inventory stocks from City Hall</p>
         </div>
         <Link 
           href="/dashboard/inventory" 
-          className="px-4 py-2 bg-white border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors flex items-center gap-2"
+          className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 rounded-md flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Inventory
@@ -160,13 +181,13 @@ export default function PurchaseOrderPage() {
                     return;
                   }
                   setDownloading(true);
-                  const order = getPurchaseOrder(lastOrderId);
-                  if (!order) {
-                    alert('Order not found. Please try again.');
-                    setDownloading(false);
-                    return;
-                  }
                   try {
+                    const order = await getPurchaseOrder(lastOrderId);
+                    if (!order) {
+                      alert('Order not found. Please try again.');
+                      setDownloading(false);
+                      return;
+                    }
                     await generatePurchaseOrderPDF(order);
                   } catch (err) {
                     console.error('PDF generation failed:', err);
@@ -195,12 +216,21 @@ export default function PurchaseOrderPage() {
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 md:grid-cols-2">
           <div>
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Order Details</CardTitle>
-                <CardDescription>Provide information about this purchase order</CardDescription>
+            <Card className="mb-6 border-l-4 border-l-blue-500 bg-white shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-lg border-b border-blue-200">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center shadow-md">
+                    <ShoppingCart className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl text-gray-900">Order Details</CardTitle>
+                    <CardDescription className="text-base text-gray-600">
+                      Provide information about this purchase order
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-6 space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-500">Reason for Request <span className="text-red-500">*</span></label>
                   <Textarea 
@@ -224,33 +254,45 @@ export default function PurchaseOrderPage() {
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Suggested Items</CardTitle>
-                <CardDescription>Items that are low or out of stock</CardDescription>
+            <Card className="border-l-4 border-l-yellow-500 bg-white shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-t-lg border-b border-yellow-200">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-yellow-600 flex items-center justify-center shadow-md">
+                    <Plus className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl text-gray-900">Suggested Items</CardTitle>
+                    <CardDescription className="text-base text-gray-600">
+                      Items that are low or out of stock
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6">
                 <div className="space-y-3">
                   {suggestedItems.length === 0 ? (
-                    <p className="text-gray-500 text-sm">No items are currently low or out of stock.</p>
+                    <div className="text-center py-8">
+                      <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500">No items are currently low or out of stock.</p>
+                    </div>
                   ) : (
                     suggestedItems.map(item => (
                       <div 
                         key={item.id} 
-                        className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-gray-50"
+                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                         onClick={() => {
                           setSelectedItemId(item.id);
                           setQuantity(Math.max(1, item.threshold - item.quantity)); // Suggest quantity to reach threshold
                         }}
                       >
                         <div>
-                          <div className="font-medium">{item.name}</div>
+                          <div className="font-medium text-gray-900">{item.name}</div>
                           <div className="text-sm text-gray-500">
                             Current: {item.quantity} {item.unit} (Threshold: {item.threshold})
                           </div>
                         </div>
                         <Badge 
-                          className={item.quantity === 0 ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"}
+                          className={item.quantity === 0 ? "bg-red-100 text-red-800 border-red-200" : "bg-yellow-100 text-yellow-800 border-yellow-200"}
                         >
                           {item.quantity === 0 ? "Out of Stock" : "Low Stock"}
                         </Badge>
@@ -263,12 +305,21 @@ export default function PurchaseOrderPage() {
           </div>
           
           <div>
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Add Items</CardTitle>
-                <CardDescription>Select items to include in this order</CardDescription>
+            <Card className="mb-6 border-l-4 border-l-green-500 bg-white shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-green-100 rounded-t-lg border-b border-green-200">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-green-600 flex items-center justify-center shadow-md">
+                    <Plus className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl text-gray-900">Add Items</CardTitle>
+                    <CardDescription className="text-base text-gray-600">
+                      Select items to include in this order
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-500">Item</label>
@@ -307,39 +358,54 @@ export default function PurchaseOrderPage() {
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
-                <CardDescription>Items in this purchase order request</CardDescription>
+            <Card className="border-l-4 border-l-red-500 bg-white shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-red-50 to-red-100 rounded-t-lg border-b border-red-200">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-red-600 flex items-center justify-center shadow-md">
+                    <ShoppingCart className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl text-gray-900">Order Summary</CardTitle>
+                    <CardDescription className="text-base text-gray-600">
+                      Items in this purchase order request
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {items.length === 0 ? (
-                  <div className="text-center py-6">
-                    <ShoppingCart className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">No items added yet</p>
+                  <div className="text-center py-12 px-6">
+                    <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 mb-2">No items added yet</p>
                     <p className="text-sm text-gray-400">Add items to create your purchase order</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
                           <tr className="border-b border-gray-200">
-                            <th className="text-left py-2 px-2 font-medium text-gray-500">Item</th>
-                            <th className="text-center py-2 px-2 font-medium text-gray-500">Quantity</th>
-                            <th className="text-center py-2 px-2 font-medium text-gray-500">Actions</th>
+                            <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                              Item
+                            </th>
+                            <th className="text-center py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                              Quantity
+                            </th>
+                            <th className="text-center py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
+                              Actions
+                            </th>
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="bg-white divide-y divide-gray-200">
                           {items.map((item, index) => (
-                            <tr key={index} className="border-b border-gray-100">
-                              <td className="py-2 px-2">
-                                <div className="font-medium">{item.itemName}</div>
+                            <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
+                              <td className="py-4 px-6">
+                                <div className="font-semibold text-gray-900">{item.itemName}</div>
                               </td>
-                              <td className="py-2 px-2 text-center">
-                                {item.quantity} {item.unit}
+                              <td className="py-4 px-6 text-center">
+                                <span className="font-medium text-gray-900">{item.quantity} {item.unit}</span>
                               </td>
-                              <td className="py-2 px-2 text-center">
+                              <td className="py-4 px-6 text-center">
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -356,22 +422,24 @@ export default function PurchaseOrderPage() {
                       </table>
                     </div>
                     
-                    <div className="flex justify-between pt-3 border-t">
-                      <div className="font-medium">Total Items:</div>
-                      <div>{totalItems}</div>
+                    <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50">
+                      <div className="font-semibold text-gray-900">Total Items:</div>
+                      <div className="text-lg font-bold text-gray-900">{totalItems}</div>
                     </div>
                     
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-red-600 hover:bg-red-700 text-white"
-                      disabled={items.length === 0 || isSubmitting}
-                    >
-                      {isSubmitting ? 
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div> : 
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                      }
-                      {isSubmitting ? "Submitting..." : "Submit Purchase Order Request"}
-                    </Button>
+                    <div className="p-6">
+                      <Button 
+                        type="submit" 
+                        className="w-full bg-red-600 hover:bg-red-700 text-white"
+                        disabled={items.length === 0 || isSubmitting}
+                      >
+                        {isSubmitting ? 
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div> : 
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                        }
+                        {isSubmitting ? "Submitting..." : "Submit Purchase Order Request"}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

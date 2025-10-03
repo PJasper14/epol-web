@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useState, useContext, ReactNode } from "react";
+import React, { createContext, useState, useContext, ReactNode, useEffect } from "react";
+import { inventoryApi } from "../services/inventoryApi";
 
 // Define types
 export interface PurchaseOrderItem {
@@ -12,134 +13,175 @@ export interface PurchaseOrderItem {
 
 export interface PurchaseOrder {
   id: string;
-  orderDate: string;
-  createdBy: string;
-  items: PurchaseOrderItem[];
-  status: "Pending" | "Completed";
+  po_number: string;
+  status: "draft" | "pending" | "approved" | "rejected" | "completed";
   notes?: string;
-  completedDate?: string;
-  supplier?: string;
+  total_amount: number;
+  created_by: number;
+  approved_by?: number;
+  approved_at?: string;
+  created_at: string;
+  updated_at: string;
+  items?: PurchaseOrderItem[];
+  created_by_user?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
+  approved_by_user?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
 }
 
 interface PurchaseOrderContextType {
   purchaseOrders: PurchaseOrder[];
-  createPurchaseOrder: (order: Omit<PurchaseOrder, "id">) => string;
-  updatePurchaseOrder: (id: string, updates: Partial<PurchaseOrder>) => void;
-  getPurchaseOrder: (id: string) => PurchaseOrder | undefined;
-  deletePurchaseOrder: (id: string) => void;
+  loading: boolean;
+  error: string | null;
+  createPurchaseOrder: (order: { items: Array<{ inventory_item_id: number; quantity: number; unit_price: number }>; notes?: string }) => Promise<string>;
+  updatePurchaseOrder: (id: string, updates: { items: Array<{ inventory_item_id: number; quantity: number; unit_price: number }>; notes?: string }) => Promise<void>;
+  getPurchaseOrder: (id: string) => Promise<PurchaseOrder | null>;
+  deletePurchaseOrder: (id: string) => Promise<void>;
+  approvePurchaseOrder: (id: string) => Promise<void>;
+  rejectPurchaseOrder: (id: string) => Promise<void>;
+  refreshPurchaseOrders: () => Promise<void>;
 }
 
 // Create the context
 const PurchaseOrderContext = createContext<PurchaseOrderContextType | undefined>(undefined);
 
-// Mock data for initial orders
-const initialPurchaseOrders: PurchaseOrder[] = [
-  {
-    id: "PO-2023-001",
-    orderDate: "2023-05-10",
-    createdBy: "Admin User",
-    items: [
-      {
-        itemId: "INV-007",
-        itemName: "Sickle (Karit) RS Brand",
-        quantity: 50,
-        unit: "Pcs"
-      },
-      {
-        itemId: "INV-008",
-        itemName: "Panabas (Itak) RS Brand",
-        quantity: 50,
-        unit: "Pcs"
-      }
-    ],
-    status: "Pending",
-    supplier: "ABC Hardware Supply"
-  },
-  {
-    id: "PO-2023-002",
-    orderDate: "2023-05-05",
-    createdBy: "Admin User",
-    items: [
-      {
-        itemId: "INV-009",
-        itemName: "Hasaan (WhetStone)",
-        quantity: 30,
-        unit: "Pcs"
-      }
-    ],
-    status: "Completed",
-    supplier: "XYZ Tools Inc.",
-    completedDate: "2023-05-15",
-    notes: "Order received and added to inventory"
-  },
-  {
-    id: "PO-2023-003",
-    orderDate: "2023-04-28",
-    createdBy: "Admin User",
-    items: [
-      {
-        itemId: "INV-001",
-        itemName: "Sako",
-        quantity: 1000,
-        unit: "Bundles"
-      }
-    ],
-    status: "Completed",
-    supplier: "Cleaning Supplies Co.",
-    completedDate: "2023-05-05",
-    notes: "Order received and added to inventory"
-  }
-];
-
 // Create the provider component
 export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState<PurchaseOrder[]>(initialPurchaseOrders);
+  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Generate a new PO ID
-  const generateOrderId = (): string => {
-    const year = new Date().getFullYear();
-    const existingOrders = orders.filter(o => o.id.includes(`PO-${year}`));
-    const lastNumber = existingOrders.length > 0
-      ? Math.max(...existingOrders.map(o => parseInt(o.id.split('-')[2])))
-      : 0;
-    return `PO-${year}-${(lastNumber + 1).toString().padStart(3, '0')}`;
+  // Load purchase orders from API
+  const loadPurchaseOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await inventoryApi.getPurchaseOrders();
+      setOrders(response.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load purchase orders');
+      console.error('Error loading purchase orders:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Load purchase orders on component mount
+  useEffect(() => {
+    loadPurchaseOrders();
+  }, []);
+
   // Create a new purchase order
-  const createPurchaseOrder = (order: Omit<PurchaseOrder, "id">): string => {
-    const newId = generateOrderId();
-    const newOrder = { ...order, id: newId };
-    setOrders(prev => [...prev, newOrder]);
-    return newId;
+  const createPurchaseOrder = async (order: { items: Array<{ inventory_item_id: number; quantity: number; unit_price: number }>; notes?: string }): Promise<string> => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await inventoryApi.createPurchaseOrder(order);
+      await loadPurchaseOrders(); // Refresh the list
+      return response.id;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create purchase order');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Update an existing purchase order
-  const updatePurchaseOrder = (id: string, updates: Partial<PurchaseOrder>) => {
-    setOrders(prev => 
-      prev.map(order => 
-        order.id === id ? { ...order, ...updates } : order
-      )
-    );
+  const updatePurchaseOrder = async (id: string, updates: { items: Array<{ inventory_item_id: number; quantity: number; unit_price: number }>; notes?: string }) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await inventoryApi.updatePurchaseOrder(id, updates);
+      await loadPurchaseOrders(); // Refresh the list
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update purchase order');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Get a specific purchase order by ID
-  const getPurchaseOrder = (id: string) => {
-    return orders.find(order => order.id === id);
+  const getPurchaseOrder = async (id: string): Promise<PurchaseOrder | null> => {
+    try {
+      const response = await inventoryApi.getPurchaseOrder(id);
+      return response;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get purchase order');
+      return null;
+    }
   };
 
   // Delete a purchase order
-  const deletePurchaseOrder = (id: string) => {
-    setOrders(prev => prev.filter(order => order.id !== id));
+  const deletePurchaseOrder = async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await inventoryApi.deletePurchaseOrder(id);
+      await loadPurchaseOrders(); // Refresh the list
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete purchase order');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Approve a purchase order
+  const approvePurchaseOrder = async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await inventoryApi.approvePurchaseOrder(id);
+      await loadPurchaseOrders(); // Refresh the list
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to approve purchase order');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Reject a purchase order
+  const rejectPurchaseOrder = async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await inventoryApi.rejectPurchaseOrder(id);
+      await loadPurchaseOrders(); // Refresh the list
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reject purchase order');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh purchase orders
+  const refreshPurchaseOrders = async () => {
+    await loadPurchaseOrders();
   };
 
   return (
     <PurchaseOrderContext.Provider
       value={{
         purchaseOrders: orders,
+        loading,
+        error,
         createPurchaseOrder,
         updatePurchaseOrder,
         getPurchaseOrder,
-        deletePurchaseOrder
+        deletePurchaseOrder,
+        approvePurchaseOrder,
+        rejectPurchaseOrder,
+        refreshPurchaseOrders
       }}
     >
       {children}

@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import Link from "next/link";
 
 import { generateInventoryRequestPDF } from "@/utils/pdfExport";
+import { inventoryApi } from "@/services/inventoryApi";
 
 interface InventoryRequest {
   id: string;
@@ -82,192 +83,12 @@ export default function InventoryRequestsPage() {
   const loadRequests = async () => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await inventoryApi.getInventoryRequests({
+        status: statusFilter !== 'all' ? statusFilter as 'pending' | 'approved' | 'rejected' : undefined,
+        limit: 50
+      });
       
-      const mockRequests: InventoryRequest[] = [
-        {
-          id: "REQ-001",
-          user: {
-            id: "1",
-            name: "John Smith",
-            email: "john.smith@epol.gov.ph"
-          },
-          reason: "Emergency cleanup operation requires additional supplies. Current stock is insufficient for the scale of the operation.",
-          request_date: "2024-01-15",
-          status: "pending",
-          items: [
-            {
-              id: "1",
-              inventory_item: {
-                id: "INV-001",
-                name: "Sako",
-                unit: "Bundles"
-              },
-              quantity: 500,
-              current_stock: 2000,
-              threshold: 500
-            },
-            {
-              id: "2",
-              inventory_item: {
-                id: "INV-002",
-                name: "Dust Pan",
-                unit: "Pcs"
-              },
-              quantity: 200,
-              current_stock: 1200,
-              threshold: 300
-            }
-          ],
-          created_at: "2024-01-15T08:30:00Z"
-        },
-        {
-          id: "REQ-002",
-          user: {
-            id: "2",
-            name: "Maria Garcia",
-            email: "maria.garcia@epol.gov.ph"
-          },
-          reason: "Regular maintenance supplies needed for weekly operations.",
-          request_date: "2024-01-14",
-          status: "approved",
-          admin_notes: "Approved for immediate procurement. Items are essential for operations.",
-          processed_by: {
-            id: "admin1",
-            name: "Admin User"
-          },
-          processed_at: "2024-01-14T14:20:00Z",
-          items: [
-            {
-              id: "3",
-              inventory_item: {
-                id: "INV-004",
-                name: "Knitted Gloves",
-                unit: "Pairs"
-              },
-              quantity: 100,
-              current_stock: 4000,
-              threshold: 1000
-            }
-          ],
-          created_at: "2024-01-14T10:15:00Z"
-        },
-        {
-          id: "REQ-003",
-          user: {
-            id: "3",
-            name: "Carlos Rodriguez",
-            email: "carlos.rodriguez@epol.gov.ph"
-          },
-          reason: "Replacement tools needed for damaged equipment.",
-          request_date: "2024-01-13",
-          status: "rejected",
-          admin_notes: "Rejected due to budget constraints. Please prioritize essential items only.",
-          processed_by: {
-            id: "admin1",
-            name: "Admin User"
-          },
-          processed_at: "2024-01-13T16:45:00Z",
-          items: [
-            {
-              id: "4",
-              inventory_item: {
-                id: "INV-007",
-                name: "Sickle (Karit) RS Brand",
-                unit: "Pcs"
-              },
-              quantity: 10,
-              current_stock: 0,
-              threshold: 50
-            }
-          ],
-          created_at: "2024-01-13T09:00:00Z"
-        },
-        {
-          id: "REQ-004",
-          user: {
-            id: "4",
-            name: "Ana Santos",
-            email: "ana.santos@epol.gov.ph"
-          },
-          reason: "Monthly restocking of cleaning supplies for office maintenance.",
-          request_date: "2024-01-12",
-          status: "pending",
-          items: [
-            {
-              id: "5",
-              inventory_item: {
-                id: "INV-008",
-                name: "Broom",
-                unit: "Pcs"
-              },
-              quantity: 50,
-              current_stock: 150,
-              threshold: 100
-            }
-          ],
-          created_at: "2024-01-12T11:30:00Z"
-        },
-        {
-          id: "REQ-005",
-          user: {
-            id: "5",
-            name: "Roberto Cruz",
-            email: "roberto.cruz@epol.gov.ph"
-          },
-          reason: "Safety equipment replacement for field operations team.",
-          request_date: "2024-01-11",
-          status: "approved",
-          admin_notes: "Approved. Safety equipment is priority.",
-          processed_by: {
-            id: "admin1",
-            name: "Admin User"
-          },
-          processed_at: "2024-01-11T15:45:00Z",
-          items: [
-            {
-              id: "6",
-              inventory_item: {
-                id: "INV-009",
-                name: "Safety Helmet",
-                unit: "Pcs"
-              },
-              quantity: 25,
-              current_stock: 75,
-              threshold: 50
-            }
-          ],
-          created_at: "2024-01-11T09:15:00Z"
-        },
-        {
-          id: "REQ-006",
-          user: {
-            id: "6",
-            name: "Luzviminda Reyes",
-            email: "luzviminda.reyes@epol.gov.ph"
-          },
-          reason: "Additional tools for new team members joining next week.",
-          request_date: "2024-01-10",
-          status: "pending",
-          items: [
-            {
-              id: "7",
-              inventory_item: {
-                id: "INV-010",
-                name: "Work Gloves",
-                unit: "Pairs"
-              },
-              quantity: 30,
-              current_stock: 200,
-              threshold: 150
-            }
-          ],
-          created_at: "2024-01-10T14:20:00Z"
-        }
-      ];
-
-      setRequests(mockRequests);
+      setRequests(response.data || []);
     } catch (error) {
       console.error("Error loading requests:", error);
     } finally {
@@ -334,21 +155,14 @@ export default function InventoryRequestsPage() {
 
     setProcessing(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await inventoryApi.updateInventoryRequestStatus(
+        selectedRequest.id,
+        action === 'approve' ? 'approved' : 'rejected',
+        adminNotes
+      );
 
-      // Update the request in the local state
-      setRequests(prev => prev.map(req => 
-        req.id === selectedRequest.id 
-          ? {
-              ...req,
-              status: action === 'approve' ? 'approved' : 'rejected',
-              admin_notes: adminNotes,
-              processed_by: { id: "admin1", name: "Admin User" },
-              processed_at: new Date().toISOString()
-            }
-          : req
-      ));
+      // Refresh the requests list
+      await loadRequests();
 
       setShowActionModal(false);
       setSelectedRequest(null);
@@ -363,7 +177,9 @@ export default function InventoryRequestsPage() {
   const downloadRequest = async (request: InventoryRequest) => {
     setDownloading(true);
     try {
-      await generateInventoryRequestPDF(request);
+      // Get the full request details from API
+      const fullRequest = await inventoryApi.getInventoryRequest(request.id);
+      await generateInventoryRequestPDF(fullRequest);
     } catch (error) {
       console.error("Error generating PDF:", error);
     } finally {
@@ -374,6 +190,7 @@ export default function InventoryRequestsPage() {
   const pendingCount = requests.filter(r => r.status === 'pending').length;
   const approvedCount = requests.filter(r => r.status === 'approved').length;
   const rejectedCount = requests.filter(r => r.status === 'rejected').length;
+  const totalCount = requests.length;
 
   // Check if any filters are active
   const hasActiveFilters = statusFilter !== 'all';
@@ -382,12 +199,12 @@ export default function InventoryRequestsPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Inventory Requests</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Inventory Requests</h1>
           <p className="text-gray-600">Manage requests from team leaders</p>
         </div>
-        <Link 
+        <Link
           href="/dashboard/inventory" 
-          className="px-4 py-2 bg-white border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors flex items-center gap-2"
+          className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 rounded-md flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Inventory
@@ -395,7 +212,21 @@ export default function InventoryRequestsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card className="border-l-4 border-l-blue-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Total Requests</p>
+                <p className="text-3xl font-bold text-gray-900">{totalCount}</p>
+              </div>
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md">
+                <Box className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
         <Card className="border-l-4 border-l-yellow-500 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -466,7 +297,7 @@ export default function InventoryRequestsPage() {
               >
                 <Filter className={`h-5 w-5 ${showFilters ? "text-white" : "text-gray-600"}`} />
                 {hasActiveFilters && (
-                  <span className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-white text-red-600 text-xs font-semibold flex items-center justify-center shadow-sm border border-red-200">
+                  <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
                     {[statusFilter].filter(filter => filter !== 'all').length}
                   </span>
                 )}
@@ -480,15 +311,27 @@ export default function InventoryRequestsPage() {
                   <h3 className="text-sm font-semibold mb-3 text-gray-700">Status</h3>
                   <div className="flex flex-wrap gap-2">
                     {[
-                      { value: "pending", label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
-                      { value: "approved", label: "Approved", color: "bg-green-100 text-green-800 border-green-200" },
-                      { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-800 border-red-200" }
+                      { value: "pending", label: "Pending" },
+                      { value: "approved", label: "Approved" },
+                      { value: "rejected", label: "Rejected" }
                     ].map((status) => (
                       <Button
                         key={status.value}
                         variant={statusFilter === status.value ? "default" : "outline"}
                         size="sm"
-                        className={`${status.color} ${statusFilter === status.value ? "ring-2 ring-offset-2 ring-red-500 shadow-md" : "border-gray-300 hover:bg-gray-50"}`}
+                        className={`${
+                          status.value === "pending" 
+                            ? statusFilter === status.value 
+                              ? "bg-yellow-600 text-white hover:bg-yellow-700 ring-2 ring-offset-2 ring-yellow-500 shadow-md" 
+                              : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200"
+                            : status.value === "approved"
+                            ? statusFilter === status.value 
+                              ? "bg-green-600 text-white hover:bg-green-700 ring-2 ring-offset-2 ring-green-500 shadow-md" 
+                              : "bg-green-100 text-green-700 hover:bg-green-200 border-green-200"
+                            : statusFilter === status.value 
+                              ? "bg-red-600 text-white hover:bg-red-700 ring-2 ring-offset-2 ring-red-500 shadow-md" 
+                              : "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
+                        }`}
                         onClick={() => setStatusFilter(statusFilter === status.value ? "all" : status.value)}
                       >
                         {status.label}
