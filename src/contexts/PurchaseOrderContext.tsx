@@ -1,7 +1,6 @@
 "use client";
 
-import React, { createContext, useState, useContext, ReactNode, useEffect } from "react";
-import { inventoryApi } from "../services/inventoryApi";
+import React, { createContext, useState, useContext, ReactNode } from "react";
 
 // Define types
 export interface PurchaseOrderItem {
@@ -17,6 +16,7 @@ export interface PurchaseOrder {
   status: "draft" | "pending" | "approved" | "rejected" | "completed";
   notes?: string;
   total_amount: number;
+  orderDate?: string;
   created_by: number;
   approved_by?: number;
   approved_at?: string;
@@ -39,12 +39,6 @@ interface PurchaseOrderContextType {
   purchaseOrders: PurchaseOrder[];
   loading: boolean;
   error: string | null;
-  createPurchaseOrder: (order: { items: Array<{ inventory_item_id: number; quantity: number; unit_price: number }>; notes?: string }) => Promise<string>;
-  updatePurchaseOrder: (id: string, updates: { items: Array<{ inventory_item_id: number; quantity: number; unit_price: number }>; notes?: string }) => Promise<void>;
-  getPurchaseOrder: (id: string) => Promise<PurchaseOrder | null>;
-  deletePurchaseOrder: (id: string) => Promise<void>;
-  approvePurchaseOrder: (id: string) => Promise<void>;
-  rejectPurchaseOrder: (id: string) => Promise<void>;
   refreshPurchaseOrders: () => Promise<void>;
 }
 
@@ -57,116 +51,12 @@ export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load purchase orders from API
-  const loadPurchaseOrders = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await inventoryApi.getPurchaseOrders();
-      setOrders(response.data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load purchase orders');
-      console.error('Error loading purchase orders:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load purchase orders on component mount
-  useEffect(() => {
-    loadPurchaseOrders();
-  }, []);
-
-  // Create a new purchase order
-  const createPurchaseOrder = async (order: { items: Array<{ inventory_item_id: number; quantity: number; unit_price: number }>; notes?: string }): Promise<string> => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await inventoryApi.createPurchaseOrder(order);
-      await loadPurchaseOrders(); // Refresh the list
-      return response.id;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create purchase order');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Update an existing purchase order
-  const updatePurchaseOrder = async (id: string, updates: { items: Array<{ inventory_item_id: number; quantity: number; unit_price: number }>; notes?: string }) => {
-    try {
-      setLoading(true);
-      setError(null);
-      await inventoryApi.updatePurchaseOrder(id, updates);
-      await loadPurchaseOrders(); // Refresh the list
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update purchase order');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Get a specific purchase order by ID
-  const getPurchaseOrder = async (id: string): Promise<PurchaseOrder | null> => {
-    try {
-      const response = await inventoryApi.getPurchaseOrder(id);
-      return response;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to get purchase order');
-      return null;
-    }
-  };
-
-  // Delete a purchase order
-  const deletePurchaseOrder = async (id: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      await inventoryApi.deletePurchaseOrder(id);
-      await loadPurchaseOrders(); // Refresh the list
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete purchase order');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Approve a purchase order
-  const approvePurchaseOrder = async (id: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      await inventoryApi.approvePurchaseOrder(id);
-      await loadPurchaseOrders(); // Refresh the list
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to approve purchase order');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Reject a purchase order
-  const rejectPurchaseOrder = async (id: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      await inventoryApi.rejectPurchaseOrder(id);
-      await loadPurchaseOrders(); // Refresh the list
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reject purchase order');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Refresh purchase orders
+  // Refresh purchase orders (simplified - no database interaction)
   const refreshPurchaseOrders = async () => {
-    await loadPurchaseOrders();
+    // This is a simplified version that doesn't interact with database
+    // Since we're only generating PDFs, we don't need to store or retrieve data
+    setLoading(false);
+    setError(null);
   };
 
   return (
@@ -175,12 +65,6 @@ export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
         purchaseOrders: orders,
         loading,
         error,
-        createPurchaseOrder,
-        updatePurchaseOrder,
-        getPurchaseOrder,
-        deletePurchaseOrder,
-        approvePurchaseOrder,
-        rejectPurchaseOrder,
         refreshPurchaseOrders
       }}
     >
@@ -196,4 +80,4 @@ export function usePurchaseOrders() {
     throw new Error('usePurchaseOrders must be used within a PurchaseOrderProvider');
   }
   return context;
-} 
+}

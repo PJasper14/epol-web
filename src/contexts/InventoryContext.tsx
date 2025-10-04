@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from "react";
-import { inventoryApi } from "../services/inventoryApi";
+import { useAdmin } from "./AdminContext";
+import { apiService } from "@/lib/api";
 
 // Define types
 export interface InventoryItem {
@@ -62,13 +63,18 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAdmin();
 
   // Load inventory items from API
   const loadInventoryItems = async () => {
+    if (!isAuthenticated) {
+      return; // Don't make API calls if not authenticated
+    }
+    
     try {
       setLoading(true);
       setError(null);
-      const response = await inventoryApi.getInventoryItems();
+      const response = await apiService.getInventoryItems();
       setItems(response.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory items');
@@ -78,17 +84,23 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Load inventory items on component mount
+  // Load inventory items on component mount only if authenticated
   useEffect(() => {
-    loadInventoryItems();
-  }, []);
+    if (isAuthenticated) {
+      loadInventoryItems();
+    }
+  }, [isAuthenticated]);
 
   // Add a new inventory item
   const addInventoryItem = async (item: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => {
+    if (!isAuthenticated) {
+      throw new Error('User must be authenticated to add inventory items');
+    }
+    
     try {
       setLoading(true);
       setError(null);
-      const response = await inventoryApi.createInventoryItem({
+      const response = await apiService.createInventoryItem({
         name: item.name,
         unit: item.unit,
         quantity: item.quantity,
@@ -107,10 +119,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // Update an inventory item
   const updateInventoryItem = async (id: string, updatedItem: Partial<InventoryItem>) => {
+    if (!isAuthenticated) {
+      throw new Error('User must be authenticated to update inventory items');
+    }
+    
     try {
       setLoading(true);
       setError(null);
-      await inventoryApi.updateInventoryItem(id, {
+      await apiService.updateInventoryItem(id, {
         name: updatedItem.name!,
         unit: updatedItem.unit!,
         threshold: updatedItem.threshold!,
@@ -128,10 +144,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // Delete an inventory item
   const deleteInventoryItem = async (id: string) => {
+    if (!isAuthenticated) {
+      throw new Error('User must be authenticated to delete inventory items');
+    }
+    
     try {
       setLoading(true);
       setError(null);
-      await inventoryApi.deleteInventoryItem(id);
+      await apiService.deleteInventoryItem(id);
       
       // Refresh the inventory list
       await loadInventoryItems();
@@ -145,9 +165,13 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // Get a specific inventory item by ID
   const getInventoryItem = async (id: string): Promise<InventoryItem | null> => {
+    if (!isAuthenticated) {
+      return null;
+    }
+    
     try {
-      const response = await inventoryApi.getInventoryItem(id);
-      return response;
+      const response = await apiService.getInventoryItem(id);
+      return response.data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get inventory item');
       return null;
@@ -156,9 +180,13 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // Get transactions for a specific item
   const getInventoryTransactions = async (itemId: string): Promise<Transaction[]> => {
+    if (!isAuthenticated) {
+      return [];
+    }
+    
     try {
-      const response = await inventoryApi.getInventoryTransactions(itemId);
-      return response.transactions?.data || [];
+      const response = await apiService.getInventoryTransactions(itemId);
+      return response.data?.transactions || [];
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get inventory transactions');
       return [];
@@ -167,10 +195,14 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // Adjust stock for an item
   const adjustStock = async (itemId: string, type: 'in' | 'out' | 'adjustment', quantity: number, reason: string) => {
+    if (!isAuthenticated) {
+      throw new Error('User must be authenticated to adjust stock');
+    }
+    
     try {
       setLoading(true);
       setError(null);
-      await inventoryApi.adjustStock(itemId, {
+      await apiService.adjustStock(itemId, {
         type,
         quantity,
         reason,
@@ -188,8 +220,12 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // Get low stock items
   const getLowStockItems = async (): Promise<InventoryItem[]> => {
+    if (!isAuthenticated) {
+      return [];
+    }
+    
     try {
-      const response = await inventoryApi.getLowStockItems();
+      const response = await apiService.getLowStockItems();
       return response.data || [];
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get low stock items');
@@ -199,8 +235,12 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // Get out of stock items
   const getOutOfStockItems = async (): Promise<InventoryItem[]> => {
+    if (!isAuthenticated) {
+      return [];
+    }
+    
     try {
-      const response = await inventoryApi.getInventoryItems({ stock_status: 'out_of_stock' });
+      const response = await apiService.getInventoryItems({ stock_status: 'out_of_stock' });
       return response.data || [];
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get out of stock items');

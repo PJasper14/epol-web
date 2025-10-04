@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { reassignmentApiService, ReassignmentRequest as ApiReassignmentRequest } from '@/services/reassignmentApi';
+import { useAdmin } from './AdminContext';
 
 export interface ReassignmentRequest {
   id: string;
@@ -54,8 +55,13 @@ export function ReassignmentRequestProvider({ children }: { children: ReactNode 
   const [requests, setRequests] = useState<ReassignmentRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAdmin();
 
   const fetchRequests = async () => {
+    if (!isAuthenticated) {
+      return; // Don't make API calls if not authenticated
+    }
+    
     try {
       setLoading(true);
       setError(null);
@@ -118,10 +124,12 @@ export function ReassignmentRequestProvider({ children }: { children: ReactNode 
     return requests.filter(request => request.status === 'pending').length;
   };
 
-  // Fetch requests on component mount
+  // Fetch requests on component mount only if authenticated
   useEffect(() => {
-    fetchRequests();
-  }, []);
+    if (isAuthenticated) {
+      fetchRequests();
+    }
+  }, [isAuthenticated]);
 
   const value: ReassignmentRequestContextType = {
     requests,

@@ -280,7 +280,7 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
               <History className="h-6 w-6 text-white" />
             </div>
             <div>
-              <CardTitle className="text-xl text-gray-900">Transaction History</CardTitle>
+              <CardTitle className="text-xl text-gray-900">Stock History</CardTitle>
               <p className="text-base text-gray-600">{transactions.length} transactions recorded</p>
             </div>
           </div>
@@ -328,8 +328,18 @@ export default function InventoryItemDetails({ item: initialItem, transactions: 
                       </Badge>
                     </td>
                     <td className="py-4 px-6">
-                      <span className={`font-semibold ${transaction.quantity > 0 ? "text-green-600" : "text-red-600"}`}>
-                        {transaction.quantity > 0 ? `+${transaction.quantity}` : transaction.quantity}
+                      <span className={`font-semibold ${
+                        transaction.type === "in" 
+                          ? "text-green-600" 
+                          : transaction.type === "out" 
+                            ? "text-red-600" 
+                            : "text-gray-600"
+                      }`}>
+                        {transaction.type === "in" 
+                          ? `+${transaction.quantity}` 
+                          : transaction.type === "out" 
+                            ? `-${transaction.quantity}` 
+                            : transaction.quantity > 0 ? `+${transaction.quantity}` : transaction.quantity}
                       </span>
                     </td>
                     <td className="py-4 px-6">

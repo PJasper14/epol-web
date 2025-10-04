@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserCheck, ShieldAlert, Boxes, Activity, ArrowRight, TrendingUp, TrendingDown, Clock, Users, UserPlus, Settings, Key, AlertTriangle } from "lucide-react";
+import { UserCheck, ShieldAlert, Boxes, Activity, ArrowRight, TrendingUp, TrendingDown, Clock, Users, UserPlus, Settings, Key, AlertTriangle, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAdmin } from "@/contexts/AdminContext";
 import { usePasswordReset } from "@/contexts/PasswordResetContext";
@@ -54,16 +54,11 @@ export default function DashboardPage() {
           <div className="relative px-8 py-12">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="flex-1">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="h-16 w-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                    <UserCheck className="h-8 w-8 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-4xl font-bold text-white mb-2">
-                      Welcome, {admin?.name}!
-                    </h1>
-                    <p className="text-red-100 text-lg font-medium">Environmental Police Administration System</p>
-                  </div>
+                <div className="mb-4 ml-6">
+                  <h1 className="text-4xl font-bold text-white mb-2">
+                    Welcome, {admin?.name}!
+                  </h1>
+                  <p className="text-red-100 text-lg font-medium">Environmental Police Administration System</p>
                 </div>
               </div>
               <div className="flex flex-col items-center lg:items-end">

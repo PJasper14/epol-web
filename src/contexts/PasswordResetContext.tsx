@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { apiService } from '@/lib/api';
+import { useAdmin } from './AdminContext';
 
 export interface PasswordResetRequest {
   id: string;
@@ -66,13 +67,20 @@ export function PasswordResetProvider({ children }: { children: ReactNode }) {
   const [requests, setRequests] = useState<PasswordResetRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAdmin();
 
-  // Load requests on mount
+  // Load requests on mount only if authenticated
   useEffect(() => {
-    refreshRequests();
-  }, []);
+    if (isAuthenticated) {
+      refreshRequests();
+    }
+  }, [isAuthenticated]);
 
   const refreshRequests = async () => {
+    if (!isAuthenticated) {
+      return; // Don't make API calls if not authenticated
+    }
+    
     setLoading(true);
     setError(null);
     try {

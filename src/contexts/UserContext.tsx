@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiService } from '@/lib/api';
+import { useAdmin } from './AdminContext';
 
 export interface User {
   id: string;
@@ -73,11 +74,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAdmin();
 
-  // Load users on component mount
+  // Load users on component mount only if authenticated
   useEffect(() => {
-    refreshUsers();
-  }, []);
+    if (isAuthenticated) {
+      refreshUsers();
+    }
+  }, [isAuthenticated]);
 
   const refreshUsers = async () => {
     setLoading(true);

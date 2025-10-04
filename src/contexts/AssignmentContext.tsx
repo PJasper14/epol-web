@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiService } from '@/lib/api';
+import { useAdmin } from './AdminContext';
 
 export interface EmployeeAssignment {
   id: string;
@@ -45,8 +46,13 @@ export function AssignmentProvider({ children }: { children: ReactNode }) {
   const [assignments, setAssignments] = useState<EmployeeAssignment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAdmin();
 
   const fetchAssignments = async () => {
+    if (!isAuthenticated) {
+      return; // Don't make API calls if not authenticated
+    }
+    
     try {
       setLoading(true);
       setError(null);
@@ -116,8 +122,10 @@ export function AssignmentProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    fetchAssignments();
-  }, []);
+    if (isAuthenticated) {
+      fetchAssignments();
+    }
+  }, [isAuthenticated]);
 
   return (
     <AssignmentContext.Provider value={{

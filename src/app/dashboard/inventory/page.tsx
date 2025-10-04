@@ -192,6 +192,8 @@ export default function InventoryPage() {
         await deleteInventoryItem(itemToDelete);
         setItemToDelete(null);
         setShowDeleteModal(false);
+        setSuccessMessage("Inventory item deleted successfully");
+        setShowSuccessModal(true);
       } catch (error) {
         console.error('Error deleting inventory item:', error);
         // Error is already handled by the context

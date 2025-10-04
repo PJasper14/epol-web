@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { WorkplaceLocation } from '@/types/location';
 import { apiService } from '@/lib/api';
+import { useAdmin } from './AdminContext';
 
 interface LocationContextType {
   workplaceLocations: WorkplaceLocation[];
@@ -39,8 +40,13 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const [workplaceLocations, setWorkplaceLocations] = useState<WorkplaceLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAdmin();
 
   const refreshLocations = async () => {
+    if (!isAuthenticated) {
+      return; // Don't make API calls if not authenticated
+    }
+    
     try {
       setLoading(true);
       setError(null);
@@ -101,8 +107,10 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    refreshLocations();
-  }, []);
+    if (isAuthenticated) {
+      refreshLocations();
+    }
+  }, [isAuthenticated]);
 
   return (
     <LocationContext.Provider value={{

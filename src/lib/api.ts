@@ -239,7 +239,16 @@ class ApiService {
   }
 
   async getLowStockItems() {
-    return this.request<any>('/inventory-items/low-stock');
+    return this.request<any>('/inventory-items/low-stock/items');
+  }
+
+  async getInventoryItem(id: string) {
+    return this.request<any>(`/inventory-items/${id}`);
+  }
+
+  async getInventoryTransactions(id: string, params?: Record<string, any>) {
+    const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<any>(`/inventory-items/${id}/transactions${queryString}`);
   }
 
   // Purchase Orders

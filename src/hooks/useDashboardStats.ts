@@ -44,7 +44,7 @@ export function useDashboardStats() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const calculateStats = () => {
+    const calculateStats = async () => {
       // Use real attendance data
       const attendanceStats = calculateAttendanceStats();
 
@@ -82,9 +82,9 @@ export function useDashboardStats() {
       const activeAccounts = mockAccountData.filter(acc => acc.status === "Active").length;
       const totalAccounts = mockAccountData.length;
 
-      // Real inventory data
-      const lowStockItems = getLowStockItems();
-      const outOfStockItems = getOutOfStockItems();
+      // Real inventory data - await the async functions
+      const lowStockItems = await getLowStockItems();
+      const outOfStockItems = await getOutOfStockItems();
 
       // Real incident data
       const pendingIncidents = incidents.filter(inc => inc.status === "Pending").length;

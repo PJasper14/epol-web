@@ -27,7 +27,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for existing session on app load
+  // Check for existing session on app load (only for refresh scenarios)
   useEffect(() => {
     const checkAuth = () => {
       try {
@@ -89,11 +89,13 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       // Call API logout
       await apiService.logout();
       localStorage.removeItem('epol_admin');
+      localStorage.removeItem('auth_token');
       setAdmin(null);
     } catch (error) {
       console.error('Logout error:', error);
       // Still clear local storage even if API call fails
       localStorage.removeItem('epol_admin');
+      localStorage.removeItem('auth_token');
       setAdmin(null);
     }
   };

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { apiService } from '@/lib/api';
+import { useAdmin } from './AdminContext';
 
 export interface Activity {
   id: string;
@@ -58,8 +59,13 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAdmin();
 
   const refreshActivities = async () => {
+    if (!isAuthenticated) {
+      return; // Don't make API calls if not authenticated
+    }
+    
     try {
       setLoading(true);
       setError(null);
@@ -83,8 +89,10 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    refreshActivities();
-  }, []);
+    if (isAuthenticated) {
+      refreshActivities();
+    }
+  }, [isAuthenticated]);
 
   const value: ActivityContextType = {
     activities,

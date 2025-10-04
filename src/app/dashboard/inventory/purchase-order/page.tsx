@@ -7,33 +7,33 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, ArrowLeft, ShoppingCart, Download } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useInventory, InventoryItem } from "@/contexts/InventoryContext";
-import { usePurchaseOrders, PurchaseOrderItem, PurchaseOrder } from "@/contexts/PurchaseOrderContext";
 import { generatePurchaseOrderPDF } from "@/utils/pdfExport";
 
+// Simple interface for purchase order items
+interface PurchaseOrderItem {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+}
+
 export default function PurchaseOrderPage() {
-  const router = useRouter();
   const { inventoryItems, getLowStockItems, getOutOfStockItems } = useInventory();
-  const { createPurchaseOrder, getPurchaseOrder, purchaseOrders } = usePurchaseOrders();
   
-  // State
+  // State for the form
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [generatedPdfData, setGeneratedPdfData] = useState<any>(null);
   const [selectedItemId, setSelectedItemId] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
   
   // Validation state
   const [validationErrors, setValidationErrors] = useState({
     reason: ""
   });
-  
-  // Get completed orders
-  const completedOrders = purchaseOrders.filter(order => order.status === "completed");
   
   // State for suggested items
   const [suggestedItems, setSuggestedItems] = useState<InventoryItem[]>([]);
@@ -46,7 +46,12 @@ export default function PurchaseOrderPage() {
           getLowStockItems(),
           getOutOfStockItems()
         ]);
-        setSuggestedItems([...lowStockItems, ...outOfStockItems]);
+        // Combine and deduplicate items
+        const allItems = [...lowStockItems, ...outOfStockItems];
+        const uniqueItems = allItems.filter((item, index, self) => 
+          index === self.findIndex(t => t.id === item.id)
+        );
+        setSuggestedItems(uniqueItems);
       } catch (error) {
         console.error('Error loading suggested items:', error);
       }
@@ -90,7 +95,7 @@ export default function PurchaseOrderPage() {
     setItems(items.filter((_, i) => i !== index));
   };
   
-  // Handle form submission
+  // Handle form submission - Generate PDF only
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -111,7 +116,6 @@ export default function PurchaseOrderPage() {
     }
     
     if (items.length === 0) {
-      // You could add validation for items if needed
       return;
     }
     
@@ -122,25 +126,37 @@ export default function PurchaseOrderPage() {
     
     setIsSubmitting(true);
     try {
-      // Transform items to match API format
-      const apiItems = items.map(item => ({
-        inventory_item_id: parseInt(item.itemId),
-        quantity: item.quantity,
-        unit_price: 0 // Default price, should be set by admin
-      }));
+      // Create PDF data structure
+      const pdfData = {
+        id: `PO-${Date.now()}`,
+        po_number: `PO-${Date.now()}`,
+        status: 'pending' as const,
+        total_amount: 0,
+        notes: reason,
+        orderDate: new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_by: 1,
+        items: items.map(item => ({
+          itemId: item.itemId,
+          itemName: item.itemName,
+          quantity: item.quantity,
+          unit: item.unit
+        }))
+      };
 
-      const orderId = await createPurchaseOrder({
-        items: apiItems,
-        notes: reason
-      });
-      
-      setLastOrderId(orderId);
+      // Store PDF data for download
+      setGeneratedPdfData(pdfData);
       setShowSuccessModal(true);
       setItems([]);
       setReason("");
       setValidationErrors({ reason: "" });
     } catch (error) {
-      console.error("Error creating purchase order:", error);
+      console.error("Error generating purchase order PDF:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -172,42 +188,34 @@ export default function PurchaseOrderPage() {
             <div className="flex flex-col items-center">
               <ShoppingCart className="h-12 w-12 text-green-600 mb-4" />
               <h2 className="text-xl font-bold mb-2 text-green-700">Purchase Order Created Successfully</h2>
-              <button
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
-                disabled={downloading}
-                onClick={async () => {
-                  if (!lastOrderId) {
-                    alert('No purchase order found to download.');
-                    return;
-                  }
-                  setDownloading(true);
-                  try {
-                    const order = await getPurchaseOrder(lastOrderId);
-                    if (!order) {
-                      alert('Order not found. Please try again.');
-                      setDownloading(false);
-                      return;
+              <p className="text-gray-600 mb-4">Your purchase order is ready for download.</p>
+              <div className="flex gap-3">
+                <button
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
+                  onClick={async () => {
+                    if (generatedPdfData) {
+                      try {
+                        await generatePurchaseOrderPDF(generatedPdfData);
+                      } catch (error) {
+                        console.error('PDF generation failed:', error);
+                        alert('Failed to generate PDF. Please try again.');
+                      }
                     }
-                    await generatePurchaseOrderPDF(order);
-                  } catch (err) {
-                    console.error('PDF generation failed:', err);
-                    alert('Failed to generate PDF. See console for details.');
-                  }
-                  setDownloading(false);
-                  setShowSuccessModal(false);
-                }}
-              >
-                {downloading ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                    Downloading...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4" /> Download Request
-                  </>
-                )}
-              </button>
+                  }}
+                >
+                  <Download className="h-4 w-4" />
+                  Download PDF
+                </button>
+                <button
+                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    setGeneratedPdfData(null);
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -276,13 +284,13 @@ export default function PurchaseOrderPage() {
                       <p className="text-gray-500">No items are currently low or out of stock.</p>
                     </div>
                   ) : (
-                    suggestedItems.map(item => (
+                    suggestedItems.map((item, index) => (
                       <div 
-                        key={item.id} 
+                        key={`suggested-${item.id}-${index}`} 
                         className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                         onClick={() => {
                           setSelectedItemId(item.id);
-                          setQuantity(Math.max(1, item.threshold - item.quantity)); // Suggest quantity to reach threshold
+                          setQuantity(Math.max(1, item.threshold - item.quantity));
                         }}
                       >
                         <div>
@@ -398,7 +406,7 @@ export default function PurchaseOrderPage() {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {items.map((item, index) => (
-                            <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
+                            <tr key={`order-item-${item.itemId}-${index}`} className="hover:bg-gray-50 transition-colors duration-150">
                               <td className="py-4 px-6">
                                 <div className="font-semibold text-gray-900">{item.itemName}</div>
                               </td>
@@ -456,4 +464,4 @@ const Badge = ({ children, className }: { children: React.ReactNode, className?:
   <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${className}`}>
     {children}
   </span>
-); 
+);
