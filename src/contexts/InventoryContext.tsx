@@ -171,7 +171,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     
     try {
       const response = await apiService.getInventoryItem(id);
-      return response.data;
+      // Backend returns the item directly, not wrapped in data
+      return response as InventoryItem;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get inventory item');
       return null;
@@ -186,7 +187,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     
     try {
       const response = await apiService.getInventoryTransactions(itemId);
-      return response.data?.transactions || [];
+      // Backend returns { item, transactions } structure
+      return (response as any).transactions?.data || [];
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get inventory transactions');
       return [];

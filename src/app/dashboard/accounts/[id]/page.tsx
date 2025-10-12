@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { 
   ArrowLeft, 
   User as UserIcon, 
-  Mail, 
   Phone, 
   Shield, 
   Calendar, 
@@ -111,31 +110,21 @@ export default function ViewAccountDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gray-50">
       <div className="p-6">
         {/* Enhanced Header with Hero Section */}
         <div className="mb-12">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-6">
-                {/* Enhanced Avatar */}
-                <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700 flex items-center justify-center shadow-2xl ring-4 ring-white/50">
-                  <span className="text-3xl font-bold text-white">
-                    {userDetails.firstName[0]}{userDetails.lastName[0]}
-                  </span>
-                </div>
-                <div>
-                  <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 bg-clip-text text-transparent">
-                    {userDetails.firstName} {userDetails.lastName}
-                  </h1>
-                  <div className="mt-2">
-                    <Link href={`/dashboard/accounts/${userId}/edit`}>
-                      <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2 text-white">
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Details
-                      </Button>
-                    </Link>
-                  </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Account Details</h1>
+                <div className="mt-4">
+                  <Link href={`/dashboard/accounts/${userId}/edit`}>
+                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2 text-white">
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Details
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -156,12 +145,12 @@ export default function ViewAccountDetailsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Personal Information */}
             <Card className="group hover:shadow-2xl transition-all duration-500 border-0 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-indigo-500/10 p-8">
+              <CardHeader className="bg-gradient-to-r from-blue-500/10 via-blue-600/10 to-indigo-500/10 p-8">
                 <CardTitle className="flex items-center gap-4 text-2xl">
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                     <UserIcon className="h-6 w-6 text-white" />
                   </div>
-                  <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent font-bold">
+                  <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent font-bold">
                     Personal Information
                   </span>
                 </CardTitle>
@@ -191,11 +180,14 @@ export default function ViewAccountDetailsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                      <Calendar className="h-3 w-3" />
-                      Age
+                      <Phone className="h-3 w-3" />
+                      Phone Number
                     </Label>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-lg font-bold text-gray-900">{userDetails.age} years old</p>
+                    <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm flex items-center justify-between group">
+                      <p className="text-sm font-semibold text-gray-900">{userDetails.phone}</p>
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100">
+                        <Copy className="h-3 w-3 text-gray-600" />
+                      </Button>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -209,19 +201,38 @@ export default function ViewAccountDetailsPage() {
                   </div>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                      <Mail className="h-3 w-3" />
-                      Email Address
+                      <Calendar className="h-3 w-3" />
+                      Birthday
                     </Label>
                     <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm flex items-center justify-between group">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{userDetails.email}</p>
+                      <p className="text-sm font-bold text-gray-900">
+                        {new Date(userDetails.birthday).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric' 
+                        })}
+                      </p>
                       <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100">
                         <Copy className="h-3 w-3 text-gray-600" />
                       </Button>
                     </div>
                   </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                      <Calendar className="h-3 w-3" />
+                      Age
+                    </Label>
+                    <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <p className="text-lg font-bold text-gray-900">{userDetails.age} years old</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
                   
                   <div className="space-y-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
@@ -233,40 +244,6 @@ export default function ViewAccountDetailsPage() {
                       <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100">
                         <Copy className="h-3 w-3 text-gray-600" />
                       </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                        <Phone className="h-3 w-3" />
-                        Phone Number
-                      </Label>
-                      <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm flex items-center justify-between group">
-                        <p className="text-sm font-semibold text-gray-900">{userDetails.phone}</p>
-                        <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100">
-                          <Copy className="h-3 w-3 text-gray-600" />
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                        <Calendar className="h-3 w-3" />
-                        Birthday
-                      </Label>
-                      <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm flex items-center justify-between group">
-                        <p className="text-sm font-bold text-gray-900">
-                          {new Date(userDetails.birthday).toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric', 
-                            year: 'numeric' 
-                          })}
-                        </p>
-                        <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100">
-                          <Copy className="h-3 w-3 text-gray-600" />
-                        </Button>
-                      </div>
                     </div>
                   </div>
                   

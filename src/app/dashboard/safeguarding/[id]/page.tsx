@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle, Clock, User, FileText, Calendar, AlertTriangle, CheckCircle, ArrowLeft, Camera, MapPin, Plus } from "lucide-react";
 import Link from "next/link";
 import { useIncidentContext } from "../IncidentContext";
+import { apiService } from "@/lib/api";
 
 // Helper function to convert 24-hour time to 12-hour format
 const formatTimeTo12Hour = (time24: string) => {
@@ -20,38 +21,57 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
   const { incidents, updateIncident } = useIncidentContext();
   const { id } = React.use(params);
 
-  if (!id) {
-    return <div className="p-8 text-center text-red-600 font-bold">No incident ID provided.</div>;
-  }
+  // All hooks must be called before any conditional returns
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showInProgressConfirm, setShowInProgressConfirm] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const incidentReport = useMemo(
     () => incidents.find(i => i.id === id),
     [incidents, id]
   );
 
+  if (!id) {
+    return <div className="p-8 text-center text-red-600 font-bold">No incident ID provided.</div>;
+  }
+
   // If not found, show a message
   if (!incidentReport) {
     return <div className="p-8 text-center text-red-600 font-bold">Incident not found.</div>;
   }
 
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [showInProgressConfirm, setShowInProgressConfirm] = useState(false);
-
-
-  const handleMarkResolved = () => {
-    updateIncident(incidentReport.id, {
-      status: "Resolved",
-      lastUpdated: new Date().toISOString()
-    });
-    setShowConfirm(false);
+  const handleMarkResolved = async () => {
+    try {
+      setIsUpdating(true);
+      await apiService.markIncidentResolved(incidentReport.id);
+      updateIncident(incidentReport.id, {
+        status: "Resolved",
+        lastUpdated: new Date().toISOString()
+      });
+      setShowConfirm(false);
+    } catch (error) {
+      console.error('Failed to mark incident as resolved:', error);
+      alert('Failed to update incident status. Please try again.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
-  const handleMarkInProgress = () => {
-    updateIncident(incidentReport.id, {
-      status: "Ongoing",
-      lastUpdated: new Date().toISOString()
-    });
-    setShowInProgressConfirm(false);
+  const handleMarkInProgress = async () => {
+    try {
+      setIsUpdating(true);
+      await apiService.markIncidentOngoing(incidentReport.id);
+      updateIncident(incidentReport.id, {
+        status: "Ongoing",
+        lastUpdated: new Date().toISOString()
+      });
+      setShowInProgressConfirm(false);
+    } catch (error) {
+      console.error('Failed to mark incident as ongoing:', error);
+      alert('Failed to update incident status. Please try again.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -88,16 +108,26 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
     switch (status) {
       case "Pending":
         return (
-          <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowInProgressConfirm(true)}>
+          <Button 
+            size="sm" 
+            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white" 
+            onClick={() => setShowInProgressConfirm(true)}
+            disabled={isUpdating}
+          >
             <Clock className="h-4 w-4" />
-            Mark as Ongoing
+            {isUpdating ? 'Updating...' : 'Mark as Ongoing'}
           </Button>
         );
       case "Ongoing":
         return (
-          <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={() => setShowConfirm(true)}>
+          <Button 
+            size="sm" 
+            className="gap-2 bg-green-600 hover:bg-green-700 text-white" 
+            onClick={() => setShowConfirm(true)}
+            disabled={isUpdating}
+          >
             <CheckCircle className="h-4 w-4" />
-            Mark as Resolved
+            {isUpdating ? 'Updating...' : 'Mark as Resolved'}
           </Button>
         );
       case "Resolved":
@@ -221,15 +251,65 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="aspect-square bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-gray-400 transition-colors cursor-pointer">
-              <Camera className="h-8 w-8 text-gray-400 mb-2" />
-              <span className="text-sm text-gray-500">No media uploaded</span>
+          {incidentReport.images && incidentReport.images.length > 0 || incidentReport.videos && incidentReport.videos.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {/* Display Images */}
+              {incidentReport.images && incidentReport.images.map((imageUrl, index) => (
+                <div key={`image-${index}`} className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                  <img 
+                    src={imageUrl} 
+                    alt={`Evidence ${index + 1}`}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-200 cursor-pointer"
+                    onClick={() => window.open(imageUrl, '_blank')}
+                    onError={(e) => {
+                      console.error('Failed to load image:', imageUrl);
+                      // Try alternative URL format
+                      const altUrl = imageUrl.replace('/storage/', '/api/storage/');
+                      if (altUrl !== imageUrl) {
+                        e.currentTarget.src = altUrl;
+                      } else {
+                        e.currentTarget.style.display = 'none';
+                      }
+                    }}
+                  />
+                </div>
+              ))}
+              
+              {/* Display Videos */}
+              {incidentReport.videos && incidentReport.videos.map((videoUrl, index) => (
+                <div key={`video-${index}`} className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                  <video 
+                    src={videoUrl}
+                    controls
+                    className="w-full h-full object-cover"
+                    preload="metadata"
+                    onError={(e) => {
+                      console.error('Failed to load video:', videoUrl);
+                      // Try alternative URL format
+                      const altUrl = videoUrl.replace('/storage/', '/api/storage/');
+                      if (altUrl !== videoUrl) {
+                        e.currentTarget.src = altUrl;
+                      } else {
+                        e.currentTarget.style.display = 'none';
+                      }
+                    }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              ))}
             </div>
-            <div className="aspect-square bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-gray-400 transition-colors cursor-pointer">
-              <Plus className="h-8 w-8 text-gray-400" />
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="aspect-square bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-gray-400 transition-colors cursor-pointer">
+                <Camera className="h-8 w-8 text-gray-400 mb-2" />
+                <span className="text-sm text-gray-500">No media uploaded</span>
+              </div>
+              <div className="aspect-square bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-gray-400 transition-colors cursor-pointer">
+                <Plus className="h-8 w-8 text-gray-400" />
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -248,8 +328,12 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
                 <Button variant="outline" className="flex-1" onClick={() => setShowInProgressConfirm(false)}>
                   Cancel
                 </Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleMarkInProgress}>
-                  Mark as Ongoing
+                <Button 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" 
+                  onClick={handleMarkInProgress}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? 'Updating...' : 'Mark as Ongoing'}
                 </Button>
               </div>
             </div>
@@ -270,8 +354,12 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
                 <Button variant="outline" className="flex-1" onClick={() => setShowConfirm(false)}>
                   Cancel
                 </Button>
-                <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={handleMarkResolved}>
-                  Mark as Resolved
+                <Button 
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white" 
+                  onClick={handleMarkResolved}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? 'Updating...' : 'Mark as Resolved'}
                 </Button>
               </div>
             </div>

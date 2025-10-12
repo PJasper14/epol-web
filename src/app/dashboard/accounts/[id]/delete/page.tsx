@@ -10,7 +10,6 @@ import {
   Trash2, 
   AlertTriangle, 
   User, 
-  Mail, 
   Shield,
   AlertCircle,
   CheckCircle,
@@ -261,15 +260,6 @@ export default function DeleteUserAccountPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      EMAIL ADDRESS
-                    </Label>
-                    <div className="px-4 py-3 bg-white border border-gray-200 rounded-lg shadow-sm">
-                      <p className="font-bold text-gray-900">{userDetails.email}</p>
-                    </div>
-                  </div>
 
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-500 flex items-center gap-2">

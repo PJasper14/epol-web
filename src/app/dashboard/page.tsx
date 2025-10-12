@@ -10,16 +10,38 @@ import { useReassignmentRequest } from "@/contexts/ReassignmentRequestContext";
 import { useActivity } from "@/contexts/ActivityContext";
 import { useState, useEffect } from "react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
-
+import { apiService } from "@/lib/api";
 export default function DashboardPage() {
-  const { admin } = useAdmin();
+  const { admin, isAuthenticated } = useAdmin();
+  const [currentAdmin, setCurrentAdmin] = useState<{name: string} | null>(null);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      window.location.href = '/';
+    }
+  }, [isAuthenticated]);
+
+  // Show loading while checking authentication
+  if (!isAuthenticated || !admin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   const { stats, loading } = useDashboardStats();
   const { getPendingCount: getPasswordResetPendingCount } = usePasswordReset();
   const { getPendingCount: getReassignmentPendingCount } = useReassignmentRequest();
-  const { getRecentActivities, loading: activitiesLoading } = useActivity();
+  const { getRecentActivities, loading: activitiesLoading, refreshActivities } = useActivity();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activityPage, setActivityPage] = useState(1);
   const activitiesPerPage = 5;
+  const [showActivities, setShowActivities] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -28,6 +50,13 @@ export default function DashboardPage() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Use admin data from context instead of making API calls
+  useEffect(() => {
+    if (admin) {
+      setCurrentAdmin({ name: admin.name });
+    }
+  }, [admin]);
 
   // Get real activities from backend
   const allActivities = getRecentActivities(50).map(activity => ({
@@ -56,9 +85,9 @@ export default function DashboardPage() {
               <div className="flex-1">
                 <div className="mb-4 ml-6">
                   <h1 className="text-4xl font-bold text-white mb-2">
-                    Welcome, {admin?.name}!
+                    Welcome, {currentAdmin?.name || admin?.name || 'Admin'}!
                   </h1>
-                  <p className="text-red-100 text-lg font-medium">Environmental Police Administration System</p>
+                  <p className="text-red-100 text-lg font-medium">Environmental Police Cabuyao City Administration System</p>
                 </div>
               </div>
               <div className="flex flex-col items-center lg:items-end">
@@ -147,18 +176,24 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold text-gray-900 mb-2">
-              {loading ? "..." : `${stats.attendance.total} Records`}
-            </div>
-            <div className="flex items-center text-sm text-red-600">
-              <UserCheck className="h-3 w-3 mr-1" />
-              {loading ? "Loading..." : `${stats.attendance.present} of ${stats.attendance.total} staff clocked in`}
-            </div>
+            {loading ? (
+              <>
+                <div className="h-9 w-32 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-4 w-48 bg-gray-100 rounded animate-pulse"></div>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  {stats.attendance.total} Records
+                </div>
+                <div className="h-5"></div>
+              </>
+            )}
           </CardContent>
           <CardFooter className="pt-0 px-6 pb-6">
             <Link href="/dashboard/attendance" className="w-full">
               <Button className="w-full bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-200">
-                View All Records
+                Manage All Records
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
@@ -178,13 +213,22 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold text-gray-900 mb-2">
-              {loading ? "..." : `${stats.employees.total} Employees`}
-            </div>
-            <div className="flex items-center text-sm text-red-600">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              {loading ? "Loading..." : `${getReassignmentPendingCount()} pending requests`}
-            </div>
+            {loading ? (
+              <>
+                <div className="h-9 w-40 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-4 w-56 bg-gray-100 rounded animate-pulse"></div>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  {stats.employees.total} Employees
+                </div>
+                <div className="flex items-center text-sm text-red-600">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {getReassignmentPendingCount()} pending reassignment requests
+                </div>
+              </>
+            )}
           </CardContent>
           <CardFooter className="pt-0 px-6 pb-6">
             <Link href="/dashboard/employees" className="w-full">
@@ -209,13 +253,22 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold text-gray-900 mb-2">
-              {loading ? "..." : `${stats.accounts.active} Accounts`}
-            </div>
-            <div className="flex items-center text-sm text-red-600">
-              <Key className="h-3 w-3 mr-1" />
-              {loading ? "Loading..." : `${getPasswordResetPendingCount()} pending password reset requests`}
-            </div>
+            {loading ? (
+              <>
+                <div className="h-9 w-36 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-4 w-60 bg-gray-100 rounded animate-pulse"></div>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  {stats.accounts.active} Accounts
+                </div>
+                <div className="flex items-center text-sm text-red-600">
+                  <Key className="h-3 w-3 mr-1" />
+                  {getPasswordResetPendingCount()} pending password reset requests
+                </div>
+              </>
+            )}
           </CardContent>
           <CardFooter className="pt-0 px-6 pb-6">
             <Link href="/dashboard/accounts" className="w-full">
@@ -243,13 +296,27 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold text-gray-900 mb-2">
-              {loading ? "..." : `${stats.inventory.total} Items`}
-            </div>
-            <div className="flex items-center text-sm text-red-600">
-              <TrendingDown className="h-3 w-3 mr-1" />
-              {loading ? "Loading..." : `${stats.inventory.lowStock} low stock, ${stats.inventory.outOfStock} out of stock`}
-            </div>
+            {loading ? (
+              <>
+                <div className="h-9 w-28 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-4 w-52 bg-gray-100 rounded animate-pulse mb-1"></div>
+                <div className="h-4 w-48 bg-gray-100 rounded animate-pulse"></div>
+              </>
+            ) : (
+              <div className="min-h-[88px]">
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  {stats.inventory.total} Items
+                </div>
+                <div className="flex items-center text-sm text-red-600 mb-1">
+                  <TrendingDown className="h-3 w-3 mr-1" />
+                  {stats.inventory.lowStock} low stock, {stats.inventory.outOfStock} out of stock
+                </div>
+                <div className="flex items-center text-sm text-orange-600">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {stats.inventory.pendingRequests} pending requests
+                </div>
+              </div>
+            )}
           </CardContent>
           <CardFooter className="pt-0 px-6 pb-6">
             <Link href="/dashboard/inventory" className="w-full">
@@ -274,18 +341,27 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold text-gray-900 mb-2">
-              {loading ? "..." : `${stats.incidents.total} Reports`}
-            </div>
-            <div className="flex items-center text-sm text-red-600">
-              <Clock className="h-3 w-3 mr-1" />
-              {loading ? "Loading..." : `${stats.incidents.pending} pending reports`}
-            </div>
+            {loading ? (
+              <>
+                <div className="h-9 w-32 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-4 w-40 bg-gray-100 rounded animate-pulse"></div>
+              </>
+            ) : (
+              <div className="min-h-[88px]">
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  {stats.incidents.total} Reports
+                </div>
+                <div className="flex items-center text-sm text-red-600">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {stats.incidents.pending} pending reports
+                </div>
+              </div>
+            )}
           </CardContent>
           <CardFooter className="pt-0 px-6 pb-6">
             <Link href="/dashboard/safeguarding" className="w-full">
               <Button className="w-full bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-200">
-                View All Reports
+                Manage All Reports
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
@@ -296,21 +372,50 @@ export default function DashboardPage() {
       </div>
 
       <div className="mb-8">
-        <Card className="shadow-lg border-l-4 border-l-red-500">
-          <CardHeader className="bg-gradient-to-r from-red-50 to-red-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-red-600 flex items-center justify-center">
-                  <Activity className="h-5 w-5 text-white" />
+        {!showActivities ? (
+          <Card className="shadow-lg border-l-4 border-l-red-500 cursor-pointer hover:shadow-xl transition-all duration-300" onClick={async () => {
+            setShowActivities(true);
+            await refreshActivities();
+          }}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-red-600 flex items-center justify-center">
+                    <Activity className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">View Activity Logs</h3>
+                    <p className="text-sm text-gray-600">Click to view system activities from the last 7 days</p>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle className="text-xl">Activity Overview</CardTitle>
-                  <CardDescription className="text-base">System activities in the last 7 days</CardDescription>
-                </div>
+                <ArrowRight className="h-6 w-6 text-red-600" />
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="shadow-lg border-l-4 border-l-red-500">
+            <CardHeader className="bg-gradient-to-r from-red-50 to-red-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-red-600 flex items-center justify-center">
+                    <Activity className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">Activity Logs</CardTitle>
+                    <CardDescription className="text-base">System activities in the last 7 days</CardDescription>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowActivities(false)}
+                  className="border-red-200 text-red-600 hover:bg-red-50"
+                >
+                  Hide
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
             <div className="space-y-4">
               {activitiesLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -389,7 +494,8 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   );
-} 
+}

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Save, AlertCircle, CheckCircle, User, Mail, Phone, Shield, Building, Calendar, Settings, Eye, EyeOff, Loader2, Sparkles, Edit3 } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, CheckCircle, User, Phone, Shield, Building, Calendar, Settings, Eye, EyeOff, Loader2, Sparkles, Edit3 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';
@@ -14,9 +14,7 @@ import { useUser } from '@/contexts/UserContext';
 interface FormData {
   firstName: string;
   lastName: string;
-  email: string;
   phone: string;
-  age: string;
   gender: string;
   birthday: string;
   homeAddress: string;
@@ -37,9 +35,7 @@ export default function EditUserAccountPage() {
   const [formData, setFormData] = useState<FormData>({
     firstName: '',
     lastName: '',
-    email: '',
     phone: '',
-    age: '',
     gender: '',
     birthday: '',
     homeAddress: '',
@@ -50,8 +46,21 @@ export default function EditUserAccountPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
+  const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [initialData, setInitialData] = useState<FormData | null>(null);
+
+  const calculateAgeFromBirthday = (birthday: string) => {
+    if (!birthday) return null;
+    const today = new Date();
+    const birthDate = new Date(birthday);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -63,19 +72,24 @@ export default function EditUserAccountPage() {
         // Find user by ID
         const user = getUserById(userId);
         if (user) {
+          // Convert birthday to YYYY-MM-DD format for date input
+          const birthdayDate = user.birthday ? new Date(user.birthday).toISOString().split('T')[0] : '';
+          
           const userData = {
             firstName: user.firstName,
             lastName: user.lastName,
-            email: user.email,
             phone: user.phone,
-            age: user.age.toString(),
             gender: user.gender,
-            birthday: user.birthday,
+            birthday: birthdayDate,
             homeAddress: user.homeAddress,
             role: user.role
           };
           setFormData(userData);
           setInitialData(userData);
+          
+          // Calculate age from birthday
+          const age = calculateAgeFromBirthday(birthdayDate);
+          setCalculatedAge(age);
         } else {
           setMessage({ type: 'error', text: 'User not found' });
         }
@@ -99,9 +113,6 @@ export default function EditUserAccountPage() {
     if (field === 'phone' && value && !/^\d+$/.test(value.replace(/\D/g, ''))) {
       return; // Only allow digits for phone
     }
-    if (field === 'age' && value && (!/^\d+$/.test(value) || parseInt(value) < 18 || parseInt(value) > 100)) {
-      return; // Only allow digits between 18-100 for age
-    }
     if (field === 'homeAddress' && value && !/^[a-zA-Z0-9\s,.-]+$/.test(value)) {
       return; // Only allow alphanumeric, spaces, commas, periods, and hyphens for home address
     }
@@ -119,11 +130,17 @@ export default function EditUserAccountPage() {
       
       return newData;
     });
+    
+    // Calculate age when birthday changes
+    if (field === 'birthday') {
+      const age = calculateAgeFromBirthday(value);
+      setCalculatedAge(age);
+    }
   };
 
   const validateForm = () => {
     const errors: FieldError[] = [];
-    const requiredFields = ['firstName', 'lastName', 'email', 'age', 'gender', 'birthday', 'homeAddress', 'role'];
+    const requiredFields = ['firstName', 'lastName', 'gender', 'birthday', 'homeAddress', 'role'];
     
     // Check required fields
     requiredFields.forEach(field => {
@@ -132,34 +149,17 @@ export default function EditUserAccountPage() {
       }
     });
 
-    // Validate email format
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.push({ field: 'email', message: 'Please enter a valid email address' });
-    }
 
-    // Validate age
-    const age = parseInt(formData.age);
-    if (formData.age && (age < 18 || age > 100)) {
-      errors.push({ field: 'age', message: 'Age must be between 18 and 100' });
-    }
-
-    // Validate birthday
+    // Validate birthday and calculate age
     if (formData.birthday) {
       const birthday = new Date(formData.birthday);
       const today = new Date();
       if (birthday >= today) {
         errors.push({ field: 'birthday', message: 'Birthday cannot be in the future' });
-      }
-
-      // Validate age matches birthday
-      if (formData.age && !isNaN(age)) {
-        let ageFromBirthday = today.getFullYear() - birthday.getFullYear();
-        const monthDiff = today.getMonth() - birthday.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthday.getDate())) {
-          ageFromBirthday--;
-        }
-        if (Math.abs(age - ageFromBirthday) > 1) {
-          errors.push({ field: 'age', message: 'Age must match the birthday' });
+      } else {
+        const age = calculateAgeFromBirthday(formData.birthday);
+        if (age !== null && (age < 18 || age > 100)) {
+          errors.push({ field: 'birthday', message: 'Age must be between 18 and 100 years old' });
         }
       }
     }
@@ -203,9 +203,8 @@ export default function EditUserAccountPage() {
       updateUser(userId, {
         firstName: formData.firstName,
         lastName: formData.lastName,
-        email: formData.email,
         phone: formData.phone,
-        age: parseInt(formData.age),
+        age: calculatedAge || 0,
         gender: formData.gender as 'Male' | 'Female',
         birthday: formData.birthday,
         homeAddress: formData.homeAddress,
@@ -370,7 +369,7 @@ export default function EditUserAccountPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {renderFormField('age', 'Age', <Calendar className="h-4 w-4" />, 'number', '25', true)}
+                {renderFormField('phone', 'Phone Number', <Phone className="h-4 w-4" />, 'tel', '+63 123 456 7890', true)}
                 {renderFormField('gender', 'Gender', <User className="h-4 w-4" />, 'select', 'Select gender', true, [
                   { value: 'Male', label: 'Male' },
                   { value: 'Female', label: 'Female' }
@@ -378,36 +377,44 @@ export default function EditUserAccountPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {renderFormField('email', 'Email Address', <Mail className="h-4 w-4" />, 'email', 'user@epol.com', true)}
-                {renderFormField('phone', 'Phone Number', <Phone className="h-4 w-4" />, 'tel', '+1 (555) 123-4567', false)}
+                {renderFormField('birthday', 'Birthday', <Calendar className="h-4 w-4" />, 'date', '', true)}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Age
+                  </Label>
+                  <div className="h-12 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 flex items-center">
+                    <span className="text-gray-900 font-medium">
+                      {calculatedAge !== null ? `${calculatedAge} years old` : 'Enter birthday'}
+                    </span>
+                  </div>
+                  {calculatedAge !== null && (calculatedAge < 18 || calculatedAge > 100) && (
+                    <div className="flex items-center gap-2 text-red-600 text-sm">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Age must be between 18 and 100 years old</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {renderFormField('birthday', 'Birthday', <Calendar className="h-4 w-4" />, 'date', '', true)}
+              <div className="grid grid-cols-1 gap-6">
                 {renderFormField('homeAddress', 'Home Address', <Building className="h-4 w-4" />, 'text', '123 Main Street, City, State 12345', true)}
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="shadow-xl border-l-4 border-l-green-500 hover:shadow-2xl transition-all duration-300">
-            <CardHeader className="bg-gradient-to-r from-green-50 to-green-100 border-b border-green-200">
-              <CardTitle className="flex items-center gap-3 text-xl">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-r from-green-600 to-green-700 flex items-center justify-center shadow-lg">
-                  <Settings className="h-5 w-5 text-white" />
+              <div className="border-t border-gray-200 pt-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-r from-green-600 to-green-700 flex items-center justify-center shadow-lg">
+                    <Settings className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">Account Settings</h3>
                 </div>
-                Account Settings
-              </CardTitle>
-              <CardDescription className="text-base text-green-700">
-                Configure user role and permissions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-8 space-y-6">
-              <div className="max-w-md">
-                {renderFormField('role', 'User Role', <Shield className="h-4 w-4" />, 'select', 'Select a role', true, [
-                  { value: 'Admin', label: 'Admin' },
-                  { value: 'Team Leader', label: 'Team Leader' },
-                  { value: 'EPOL', label: 'EPOL' }
-                ])}
+                <div className="max-w-md">
+                  {renderFormField('role', 'User Role', <Shield className="h-4 w-4" />, 'select', 'Select a role', true, [
+                    { value: 'Admin', label: 'Admin' },
+                    { value: 'Team Leader', label: 'Team Leader' },
+                    { value: 'EPOL', label: 'EPOL' }
+                  ])}
+                </div>
               </div>
             </CardContent>
           </Card>

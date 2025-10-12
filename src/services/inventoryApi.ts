@@ -4,11 +4,19 @@ class InventoryApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = localStorage.getItem('auth_token');
     
+    if (!token) {
+      // Redirect to login if no token
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
+      throw new Error('Authentication required. Please log in.');
+    }
+    
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
+        'Authorization': `Bearer ${token}`,
         ...options.headers,
       },
       ...options,
@@ -17,6 +25,15 @@ class InventoryApiService {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
     if (!response.ok) {
+      if (response.status === 401) {
+        // Clear tokens and redirect on authentication failure
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('epol_admin');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          window.location.href = '/';
+        }
+        throw new Error('Session expired. Please log in again.');
+      }
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }

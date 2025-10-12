@@ -55,8 +55,7 @@ export default function PasswordResetRequestsPage() {
   const itemsPerPage = 10;
 
   const filteredRequests = requests.filter(request => {
-    const matchesSearch = request.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         request.user_email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = request.user_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || request.status === filterStatus;
     
     return matchesSearch && matchesStatus;
@@ -120,9 +119,7 @@ export default function PasswordResetRequestsPage() {
 
   const handleApprove = async (requestId: string) => {
     try {
-      // Generate a new password for the user
-      const newPassword = generateNewPassword();
-      await approveRequest(requestId, newPassword, adminNotes || 'Request approved by administrator');
+      await approveRequest(requestId, adminNotes || 'Request approved by administrator');
       setSelectedRequest(null);
       setAdminNotes('');
     } catch (error) {
@@ -142,15 +139,6 @@ export default function PasswordResetRequestsPage() {
     }
   };
 
-  const generateNewPassword = () => {
-    // Generate a secure random password
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
-  };
 
   const handleDelete = (requestId: string) => {
     const request = requests.find(r => r.id === requestId);
@@ -517,13 +505,6 @@ export default function PasswordResetRequestsPage() {
                   </div>
                   
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                        <Mail className="h-4 w-4" />
-                        Email
-                      </Label>
-                      <p className="text-base text-slate-600">{selectedRequest.user_email}</p>
-                    </div>
                     
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-gray-600 flex items-center gap-2">

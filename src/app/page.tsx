@@ -12,11 +12,12 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Clock, Users, Key, Package, Shield } from "lucide-react";
 
 export default function LoginPage() {
-  const { login, loading, isAuthenticated } = useAdmin();
+  const { login, loading: initialLoading, isAuthenticated } = useAdmin();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const router = useRouter();
 
   // Redirect if already authenticated
@@ -26,8 +27,8 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
-  // Show loading while checking authentication
-  if (loading) {
+  // Show loading while checking initial authentication (on page load only)
+  if (initialLoading) {
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gray-50 p-4 sm:p-6 md:p-8">
         <div className="text-center">
@@ -52,17 +53,36 @@ export default function LoginPage() {
       return;
     }
 
-    const success = await login(username, password);
-    if (success) {
-      router.push('/dashboard');
-    } else {
-      setError('Invalid username or password');
+    setIsLoggingIn(true);
+    try {
+      const success = await login(username, password);
+      if (success) {
+        // Keep loading state while redirecting to avoid white screen
+        router.push('/dashboard');
+        // Don't set isLoggingIn to false on success - let the redirect happen
+      } else {
+        setError('Invalid username or password');
+        setIsLoggingIn(false);
+      }
+    } catch (error) {
+      setError('An error occurred. Please try again.');
+      setIsLoggingIn(false);
     }
   };
 
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 relative">
+      {/* Loading Overlay - shown during redirect */}
+      {isLoggingIn && (
+        <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 font-medium">Signing in...</p>
+          </div>
+        </div>
+      )}
+      
       {/* Background Image */}
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-50"
@@ -170,9 +190,9 @@ export default function LoginPage() {
                 <Button 
                   type="submit" 
                   className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading}
+                  disabled={isLoggingIn}
                 >
-                  {loading ? (
+                  {isLoggingIn ? (
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                       <span className="font-medium">Signing in...</span>
@@ -199,7 +219,7 @@ export default function LoginPage() {
             <div className="relative z-10 h-full flex flex-col items-center justify-center text-white p-12">
               <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold mb-2">EPOL Admin</h2>
-                <p className="text-red-100 text-sm">Environmental Police System</p>
+                <p className="text-red-100 text-sm">Environmental Police Cabuyao City Administration System</p>
               </div>
               
               {/* Main Modules Grid */}

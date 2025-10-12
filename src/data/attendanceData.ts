@@ -51,13 +51,20 @@ export function getAttendanceStatus(record: AttendanceRecord): string {
 
 // Calculate attendance statistics
 export function calculateAttendanceStats() {
-  const totalRecords = attendanceRecords.length;
-  const presentRecords = attendanceRecords.filter(record => {
+  // Get current date in YYYY-MM-DD format
+  const today = new Date();
+  const currentDate = today.toISOString().split('T')[0];
+  
+  // Filter records for current date only
+  const todayRecords = attendanceRecords.filter(record => record.date === currentDate);
+  
+  const totalRecords = todayRecords.length;
+  const presentRecords = todayRecords.filter(record => {
     const status = getAttendanceStatus(record);
     return status === "Present";
   }).length;
   
-  const percentage = Math.round((presentRecords / totalRecords) * 100);
+  const percentage = totalRecords > 0 ? Math.round((presentRecords / totalRecords) * 100) : 0;
   
   return {
     total: totalRecords,

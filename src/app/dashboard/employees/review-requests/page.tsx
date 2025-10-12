@@ -30,7 +30,9 @@ import {
   Users,
   Eye,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertCircle,
+  Info
 } from "lucide-react";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -174,14 +176,9 @@ export default function ReviewRequestsPage() {
 
   const handleReject = async () => {
     if (selectedRequest) {
-      if (!reviewNotes.trim()) {
-        alert('Please provide a reason for rejection.');
-        return;
-      }
-      
       try {
         setIsProcessing(true);
-        await rejectRequest(selectedRequest.id, reviewNotes);
+        await rejectRequest(selectedRequest.id, reviewNotes || 'Rejected by admin');
         setShowReviewModal(false);
         setSelectedRequest(null);
         setReviewNotes("");
@@ -529,129 +526,223 @@ export default function ReviewRequestsPage() {
 
       {/* Review Modal */}
       <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
-        <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto bg-white border-gray-200 shadow-xl">
-          <DialogHeader className="pb-3">
-            <DialogTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <UserCheck className="h-4 w-4 text-orange-600" />
-              Reassignment/Redeployment Request
+        <DialogContent className="sm:max-w-[650px] bg-white border-gray-200 shadow-xl [&>button]:hidden">
+          <DialogHeader className="pb-3 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <div className={`h-10 w-10 rounded-full flex items-center justify-center shadow-lg flex-shrink-0 ${
+                selectedRequest?.status === 'approved' 
+                  ? 'bg-gradient-to-br from-green-500 to-green-600'
+                  : selectedRequest?.status === 'rejected'
+                  ? 'bg-gradient-to-br from-red-500 to-red-600'
+                  : 'bg-gradient-to-br from-orange-500 to-orange-600'
+              }`}>
+                {selectedRequest?.status === 'approved' ? (
+                  <CheckCircle className="h-5 w-5 text-white" />
+                ) : selectedRequest?.status === 'rejected' ? (
+                  <XCircle className="h-5 w-5 text-white" />
+                ) : (
+                  <UserCheck className="h-5 w-5 text-white" />
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <DialogTitle className="text-xl font-bold text-gray-900">
+                    Reassignment Request
             </DialogTitle>
-            <DialogDescription className="text-sm text-gray-600">
-              Review and make a decision on this reassignment/redeployment request.
+                  {selectedRequest && (
+                    <Badge className={`${getStatusColor(selectedRequest.status)} border flex items-center gap-1 text-xs`}>
+                      {getStatusIcon(selectedRequest.status)}
+                      {selectedRequest.status.charAt(0).toUpperCase() + selectedRequest.status.slice(1)}
+                    </Badge>
+                  )}
+                </div>
+                <DialogDescription className="text-gray-600 text-xs mt-0.5">
+                  {selectedRequest?.status === 'pending' 
+                    ? 'Review and make a decision on this request'
+                    : 'View details of this request'}
             </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
           
           {selectedRequest && (
-            <div className="py-3 space-y-3">
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">Employee Information</h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-gray-500">Name:</span>
-                    <p className="font-medium">{selectedRequest.employeeName}</p>
+            <div className="space-y-3 py-3">
+              {/* Employee Information Card */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                    <User className="h-4 w-4 text-white" />
                   </div>
-                  <div>
-                    <span className="text-gray-500">Position:</span>
-                    <p className="font-medium">{selectedRequest.employeePosition}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Request ID:</span>
-                    <p className="font-medium">{selectedRequest.id}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-blue-900 text-base">{selectedRequest.employeeName}</p>
+                    <p className="text-blue-700 text-sm">{selectedRequest.employeePosition}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">Location Details</h3>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-gray-500" />
-                    <span className="text-gray-500">Current Location:</span>
-                    <span className="font-medium">{selectedRequest.currentLocation}</span>
+              {/* Visual FROM → TO Location Indicator */}
+              <div className="flex items-center gap-2 px-2">
+                <div className="flex-1 bg-gray-100 rounded-lg p-3 border border-gray-300">
+                  <p className="text-xs text-gray-600 font-medium mb-1">FROM</p>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3 w-3 text-gray-600" />
+                    <p className="font-semibold text-sm text-gray-900">{selectedRequest.currentLocation}</p>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-blue-600" />
-                    <span className="text-gray-500">Requested Location:</span>
-                    <span className="font-medium text-blue-600">{selectedRequest.requestedLocation}</span>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center shadow-md">
+                    <ArrowLeft className="h-4 w-4 text-white transform rotate-180" />
+                  </div>
+                </div>
+                <div className="flex-1 bg-blue-100 rounded-lg p-3 border-2 border-blue-300">
+                  <p className="text-xs text-blue-600 font-medium mb-1">TO</p>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3 w-3 text-blue-600" />
+                    <p className="font-semibold text-sm text-blue-900">{selectedRequest.requestedLocation}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">Request Details</h3>
-                <div className="space-y-1 text-sm">
-                  <div>
-                    <span className="text-gray-500">Request Date:</span>
-                    <p className="font-medium">{selectedRequest.requestDate}</p>
+              {/* Request Details Card */}
+              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <div className="h-8 w-8 rounded-full bg-yellow-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                    <FileText className="h-4 w-4 text-white" />
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-xs font-semibold text-yellow-900 mb-2">
+                      Request Details
+                    </h3>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex items-start gap-2">
+                        <Info className="h-3 w-3 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-yellow-700 text-xs">Request ID</p>
+                          <p className="font-medium text-yellow-900 text-sm">{selectedRequest.id}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Calendar className="h-3 w-3 text-yellow-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <span className="text-gray-500">Reason:</span>
-                    <p className="font-medium mt-1">{selectedRequest.reason}</p>
+                          <p className="text-yellow-700 text-xs">Request Date</p>
+                          <p className="font-semibold text-yellow-900 text-sm">{selectedRequest.requestDate}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <MessageSquare className="h-3 w-3 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-yellow-700 text-xs">Reason</p>
+                          <p className="font-medium text-yellow-900 text-sm mt-0.5">{selectedRequest.reason}</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="review-notes" className="text-sm font-medium text-gray-700">
+              {/* Review Notes Section */}
+              <div className={`border rounded-lg p-3 ${
+                selectedRequest.status === 'pending' 
+                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+                  : selectedRequest.status === 'approved'
+                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+                  : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
+              }`}>
+                <div className="flex items-start gap-2">
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ${
+                    selectedRequest.status === 'pending'
+                      ? 'bg-green-500'
+                      : selectedRequest.status === 'approved'
+                      ? 'bg-green-500'
+                      : 'bg-red-500'
+                  }`}>
+                    <MessageSquare className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <h3 className={`text-xs font-semibold ${
+                      selectedRequest.status === 'pending'
+                        ? 'text-green-900'
+                        : selectedRequest.status === 'approved'
+                        ? 'text-green-900'
+                        : 'text-red-900'
+                    }`}>
                   {selectedRequest.status === 'pending' ? 'Review Notes (Optional)' : 'Review Notes'}
-                </Label>
+                    </h3>
                 {selectedRequest.status === 'pending' ? (
                   <Textarea
                     id="review-notes"
                     placeholder="Add your review notes here..."
                     value={reviewNotes}
                     onChange={(e) => setReviewNotes(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+                        className="w-full border-green-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none text-sm"
                     rows={2}
                   />
                 ) : (
-                  <div className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-600 min-h-[60px]">
+                      <p className={`text-sm ${
+                        selectedRequest.status === 'approved'
+                          ? 'text-green-900'
+                          : 'text-red-900'
+                      }`}>
                     {selectedRequest.reviewNotes || 'No review notes provided'}
+                      </p>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
+
+              {/* Info Alert for Pending Requests */}
+              {selectedRequest.status === 'pending' && (
+                <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-3 w-3 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-blue-800">
+                      <strong className="font-semibold">Note:</strong> Approving this request will immediately reassign the employee to the requested location.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          <DialogFooter className="pt-3 border-t border-gray-200">
+          <DialogFooter className="pt-3 border-t border-gray-200 flex items-center justify-end gap-2">
+            {selectedRequest?.status === 'pending' ? (
+              <>
             <Button 
               variant="outline" 
               onClick={() => setShowReviewModal(false)} 
-              className="border-gray-300 hover:bg-gray-50"
+                  className="bg-gray-900 hover:bg-gray-800 text-white border-gray-900 px-6"
             >
               Cancel
             </Button>
-            {selectedRequest?.status === 'pending' && (
-              <>
                 <Button 
                   onClick={handleReject}
                   disabled={isProcessing}
-                  className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                  className="bg-red-600 hover:bg-red-700 text-white px-6 shadow-lg disabled:opacity-50"
                 >
                   {isProcessing ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   ) : (
-                    <X className="h-4 w-4 mr-2" />
+                    <XCircle className="h-4 w-4 mr-2" />
                   )}
-                  {isProcessing ? 'Processing...' : 'Reject'}
+                  {isProcessing ? 'Processing...' : 'Reject Request'}
                 </Button>
                 <Button 
                   onClick={handleApprove}
                   disabled={isProcessing}
-                  className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 shadow-lg disabled:opacity-50"
                 >
                   {isProcessing ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   ) : (
-                    <UserCheck className="h-4 w-4 mr-2" />
+                    <CheckCircle className="h-4 w-4 mr-2" />
                   )}
-                  {isProcessing ? 'Processing...' : 'Approve'}
+                  {isProcessing ? 'Processing...' : 'Approve Request'}
                 </Button>
               </>
-            )}
-            {selectedRequest?.status !== 'pending' && (
+            ) : (
               <Button 
                 onClick={() => setShowReviewModal(false)}
-                className="bg-orange-600 hover:bg-orange-700 text-white"
+                className="bg-red-600 hover:bg-red-700 text-white px-6 shadow-lg"
               >
                 Close
               </Button>

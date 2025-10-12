@@ -12,6 +12,7 @@ import { LocationProvider } from "@/contexts/LocationContext";
 import { AdminProvider } from "@/contexts/AdminContext";
 import { UserProvider } from "@/contexts/UserContext";
 import { AssignmentProvider } from "@/contexts/AssignmentContext";
+import { AttendanceProvider } from "@/contexts/AttendanceContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,17 +54,19 @@ export default function RootLayout({
             <ActivityProvider>
               <LocationProvider>
                 <AssignmentProvider>
-                  <InventoryProvider>
-                    <PurchaseOrderProvider>
-                      <IncidentProvider>
-                        <PasswordResetProvider>
-                          <ReassignmentRequestProvider>
-                            {children}
-                          </ReassignmentRequestProvider>
-                        </PasswordResetProvider>
-                      </IncidentProvider>
-                    </PurchaseOrderProvider>
-                  </InventoryProvider>
+                  <AttendanceProvider>
+                    <InventoryProvider>
+                      <PurchaseOrderProvider>
+                        <IncidentProvider>
+                          <PasswordResetProvider>
+                            <ReassignmentRequestProvider>
+                              {children}
+                            </ReassignmentRequestProvider>
+                          </PasswordResetProvider>
+                        </IncidentProvider>
+                      </PurchaseOrderProvider>
+                    </InventoryProvider>
+                  </AttendanceProvider>
                 </AssignmentProvider>
               </LocationProvider>
             </ActivityProvider>

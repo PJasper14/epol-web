@@ -6,7 +6,6 @@ import { apiService } from '@/lib/api';
 export interface AdminUser {
   id: string;
   name: string;
-  email: string;
   role: 'Admin';
   department: 'Office';
 }
@@ -45,9 +44,35 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
-    setLoading(true);
+  // Listen for admin data updates from other components
+  useEffect(() => {
+    const handleAdminDataUpdate = (event: CustomEvent) => {
+      const updatedAdmin = event.detail;
+      setAdmin(updatedAdmin);
+    };
+
+    window.addEventListener('adminDataUpdated', handleAdminDataUpdate as EventListener);
     
+    return () => {
+      window.removeEventListener('adminDataUpdated', handleAdminDataUpdate as EventListener);
+    };
+  }, []);
+
+  // Simplified: Only listen for custom events from dashboard
+  useEffect(() => {
+    const handleAdminDataUpdate = (event: CustomEvent) => {
+      const updatedAdmin = event.detail;
+      setAdmin(updatedAdmin);
+    };
+
+    window.addEventListener('adminDataUpdated', handleAdminDataUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('adminDataUpdated', handleAdminDataUpdate as EventListener);
+    };
+  }, []);
+
+  const login = async (username: string, password: string): Promise<boolean> => {
     try {
       // Use API service for authentication
       const response = await apiService.login(username, password);
@@ -57,29 +82,24 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         
         // Check if user is admin
         if (user.role !== 'admin') {
-          setLoading(false);
           return false;
         }
         
         const adminUser: AdminUser = {
           id: user.id.toString(),
           name: `${user.first_name} ${user.last_name}`,
-          email: user.email,
           role: 'Admin',
           department: 'Office'
         };
         
         localStorage.setItem('epol_admin', JSON.stringify(adminUser));
         setAdmin(adminUser);
-        setLoading(false);
         return true;
       } else {
-        setLoading(false);
         return false;
       }
     } catch (error) {
       console.error('Login error:', error);
-      setLoading(false);
       return false;
     }
   };

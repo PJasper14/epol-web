@@ -8,7 +8,6 @@ export interface User {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
   phone: string;
   age: number;
   gender: 'Male' | 'Female';
@@ -43,14 +42,13 @@ const transformApiUser = (apiUser: any): User => {
     id: apiUser.id.toString(),
     firstName: apiUser.first_name,
     lastName: apiUser.last_name,
-    email: apiUser.email,
     phone: apiUser.phone,
     age: apiUser.age,
     gender: apiUser.gender,
     birthday: apiUser.birthday,
     homeAddress: apiUser.home_address,
     role: apiUser.role === 'admin' ? 'Admin' : apiUser.role === 'team_leader' ? 'Team Leader' : 'EPOL',
-    username: apiUser.username || apiUser.email.split('@')[0],
+    username: apiUser.username || '',
     lastUpdated: new Date(apiUser.updated_at).toLocaleString('en-US', {
       year: 'numeric',
       month: '2-digit',
@@ -114,7 +112,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const apiUserData = {
         first_name: userData.firstName,
         last_name: userData.lastName,
-        email: userData.email,
         username: userData.username,
         password: userData.password || 'defaultPassword123',
         role: userData.role.toLowerCase().replace(' ', '_'),
@@ -145,7 +142,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const apiUserData: any = {};
       if (updates.firstName) apiUserData.first_name = updates.firstName;
       if (updates.lastName) apiUserData.last_name = updates.lastName;
-      if (updates.email) apiUserData.email = updates.email;
       if (updates.phone) apiUserData.phone = updates.phone;
       if (updates.age) apiUserData.age = updates.age;
       if (updates.gender) apiUserData.gender = updates.gender;

@@ -9,12 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Search, 
   Filter, 
-  CheckCircle, 
-  XCircle, 
+  CheckCircle,
+  XCircle,
   Clock, 
   AlertTriangle,
   Eye,
-  Download,
   X,
   ArrowLeft,
   Box
@@ -22,7 +21,6 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Link from "next/link";
 
-import { generateInventoryRequestPDF } from "@/utils/pdfExport";
 import { inventoryApi } from "@/services/inventoryApi";
 
 interface InventoryRequest {
@@ -69,7 +67,6 @@ export default function InventoryRequestsPage() {
   const [action, setAction] = useState<'approve' | 'reject'>('approve');
   const [adminNotes, setAdminNotes] = useState("");
   const [processing, setProcessing] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -174,18 +171,6 @@ export default function InventoryRequestsPage() {
     }
   };
 
-  const downloadRequest = async (request: InventoryRequest) => {
-    setDownloading(true);
-    try {
-      // Get the full request details from API
-      const fullRequest = await inventoryApi.getInventoryRequest(request.id);
-      await generateInventoryRequestPDF(fullRequest);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
   const approvedCount = requests.filter(r => r.status === 'approved').length;
@@ -396,7 +381,6 @@ export default function InventoryRequestsPage() {
                     </td>
                     <td className="py-4 px-6">
                       <div className="font-semibold text-gray-900">{request.user.name}</div>
-                        <div className="text-sm text-gray-500">{request.user.email}</div>
                     </td>
                     <td className="py-4 px-6">
                       <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusColor(request.status)}`}>
@@ -423,16 +407,6 @@ export default function InventoryRequestsPage() {
                         >
                           <Eye className="h-3.5 w-3.5 mr-1" />
                           View Details
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 bg-black text-white border-black hover:bg-gray-800 hover:border-gray-800 shadow-sm"
-                          onClick={() => downloadRequest(request)}
-                          disabled={downloading}
-                        >
-                          <Download className="h-3.5 w-3.5 mr-1" />
-                          PDF
                         </Button>
                         {request.status === 'pending' && (
                           <>
@@ -542,7 +516,6 @@ export default function InventoryRequestsPage() {
                 <div>
                   <label className="text-sm font-medium text-gray-700">Team Leader</label>
                   <p className="text-gray-900">{selectedRequest.user.name}</p>
-                  <p className="text-sm text-gray-500">{selectedRequest.user.email}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700">Request Date</label>
@@ -611,7 +584,7 @@ export default function InventoryRequestsPage() {
             </DialogTitle>
             <DialogDescription className="text-gray-600">
               {action === 'approve' 
-                ? 'Approve this inventory request and create a purchase order'
+                ? 'Approve this inventory request'
                 : 'Reject this inventory request with a reason'
               }
             </DialogDescription>

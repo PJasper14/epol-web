@@ -45,7 +45,7 @@ export default function AccountManagementPage() {
   const filteredUsers = users.filter(user => {
     const fullName = `${user.firstName} ${user.lastName}`;
     const matchesSearch = fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+                         user.username.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = !selectedRole || user.role === selectedRole;
     
     return matchesSearch && matchesRole;
@@ -67,7 +67,7 @@ export default function AccountManagementPage() {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'Admin': return 'bg-red-100 text-red-800 border-red-200';
-      case 'Team Leader': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'Team Leader': return 'bg-green-100 text-green-800 border-green-200';
       case 'EPOL': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -204,7 +204,7 @@ export default function AccountManagementPage() {
                 <Link href="/dashboard/accounts/create">
                   <Button className="bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
                     <UserPlus className="h-4 w-4 mr-2" />
-                    Create Account
+                    Add Employee
                   </Button>
                 </Link>
                 <Link href="/dashboard/accounts/password-resets">
@@ -236,11 +236,11 @@ export default function AccountManagementPage() {
                               : "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
                             : role === "Team Leader"
                             ? selectedRole === role 
-                              ? "bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-offset-2 ring-blue-500 shadow-md" 
-                              : "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200"
-                            : selectedRole === role 
                               ? "bg-green-600 text-white hover:bg-green-700 ring-2 ring-offset-2 ring-green-500 shadow-md" 
                               : "bg-green-100 text-green-700 hover:bg-green-200 border-green-200"
+                            : selectedRole === role 
+                              ? "bg-yellow-600 text-white hover:bg-yellow-700 ring-2 ring-offset-2 ring-yellow-500 shadow-md" 
+                              : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200"
                         }`}
                         onClick={() => setSelectedRole(selectedRole === role ? null : role)}
                       >
@@ -313,7 +313,6 @@ export default function AccountManagementPage() {
                     <tr key={user.id} className="hover:bg-gray-50 transition-colors duration-150">
                       <td className="py-4 px-6">
                         <div className="font-semibold text-gray-900">{user.firstName} {user.lastName}</div>
-                        <div className="text-sm text-gray-500">ID: {user.id}</div>
                       </td>
                       <td className="py-4 px-6">
                         <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getRoleColor(user.role)}`}>

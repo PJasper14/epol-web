@@ -36,28 +36,34 @@ import { generateAttendancePDF } from "@/utils/attendancePdfExport";
 import { EmployeeAttendanceModal } from "@/components/ui/EmployeeAttendanceModal";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Link from "next/link";
-import { attendanceRecords } from "@/data/attendanceData";
+import { useAttendance } from "@/contexts/AttendanceContext";
+import { apiService } from "@/lib/api";
 
 // Helper function to calculate hours rendered
 function getHoursRendered(record: any) {
-  if (!record.clockIn || !record.clockOut) return "-";
+  if (!record.time_in || !record.time_out) return "-";
   
-  // Convert 12-hour format to 24-hour format for calculation
-  const convertTo24Hour = (timeStr: string) => {
-    const [time, period] = timeStr.split(' ');
-    const [hours, minutes] = time.split(':').map(Number);
-    const hour24 = period === 'PM' ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
-    return { hours: hour24, minutes };
+  // Parse time strings - handle both ISO format and time-only format
+  const parseTime = (timeStr: string) => {
+    if (timeStr.includes('T')) {
+      // ISO format like "2025-10-05T23:17:59.000000Z"
+      return new Date(timeStr);
+    } else {
+      // Time format like "23:17:59"
+      const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hours, minutes, seconds || 0, 0);
+      return date;
+    }
   };
 
-  const clockIn = convertTo24Hour(record.clockIn);
-  const clockOut = convertTo24Hour(record.clockOut);
+  const clockInTime = parseTime(record.time_in);
+  const clockOutTime = parseTime(record.time_out);
   
-  // Calculate total minutes
-  const clockInMinutes = (clockIn.hours * 60) + clockIn.minutes;
-  const clockOutMinutes = (clockOut.hours * 60) + clockOut.minutes;
+  // Calculate difference in milliseconds, then convert to minutes
+  const diffMs = clockOutTime.getTime() - clockInTime.getTime();
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
   
-  const totalMinutes = clockOutMinutes - clockInMinutes;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   
@@ -67,12 +73,22 @@ function getHoursRendered(record: any) {
 // Helper function to check if within allowable clock-in time
 function isAllowableClockIn(clockIn: string | null) {
   if (!clockIn) return false;
-  const [time, period] = clockIn.split(' ');
-  const [hours, minutes] = time.split(':').map(Number);
-  const hour24 = period === 'PM' ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
   
-  // Check if clock-in is between 2:20 PM and 2:30 PM
-  if (hour24 === 14) {
+  // Parse time - handle both ISO format and time-only format
+  let timeDate: Date;
+  if (clockIn.includes('T')) {
+    timeDate = new Date(clockIn);
+  } else {
+    const [hours, minutes] = clockIn.split(':').map(Number);
+    timeDate = new Date();
+    timeDate.setHours(hours, minutes, 0, 0);
+  }
+  
+  const hours = timeDate.getHours();
+  const minutes = timeDate.getMinutes();
+  
+  // Check if clock-in is between 2:20 PM and 2:30 PM (14:20 to 14:30)
+  if (hours === 14) {
     return minutes >= 20 && minutes <= 30;
   }
   return false;
@@ -81,16 +97,26 @@ function isAllowableClockIn(clockIn: string | null) {
 // Helper function to check if late
 function isLate(clockIn: string | null) {
   if (!clockIn) return false;
-  const [time, period] = clockIn.split(' ');
-  const [hours, minutes] = time.split(':').map(Number);
-  const hour24 = period === 'PM' ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
   
-  // Check if clock-in is after 2:30 PM
-  return hour24 > 14 || (hour24 === 14 && minutes > 30);
+  // Parse time - handle both ISO format and time-only format
+  let timeDate: Date;
+  if (clockIn.includes('T')) {
+    timeDate = new Date(clockIn);
+  } else {
+    const [hours, minutes] = clockIn.split(':').map(Number);
+    timeDate = new Date();
+    timeDate.setHours(hours, minutes, 0, 0);
+  }
+  
+  const hours = timeDate.getHours();
+  const minutes = timeDate.getMinutes();
+  
+  // Check if clock-in is after 2:30 PM (14:30)
+  return hours > 14 || (hours === 14 && minutes > 30);
 }
 
-// Helper function to check if undertime
-function isUndertime(hoursRendered: string) {
+// Helper function to check if undertime (31 minutes or more short)
+function isUndertime(hoursRendered: string, requiredHours: number = 6) {
   if (hoursRendered === "-") return false;
   const [hoursStr, minutesStr] = hoursRendered.split('h ');
   const hours = parseInt(hoursStr);
@@ -98,60 +124,113 @@ function isUndertime(hoursRendered: string) {
   
   // Convert to total minutes for comparison
   const totalMinutes = (hours * 60) + minutes;
-  // 3 hours and 30 minutes = 210 minutes
-  return totalMinutes < 210;
+  const requiredMinutes = requiredHours * 60;
+  
+  // Undertime: 31 minutes or more short of required hours
+  const shortfall = requiredMinutes - totalMinutes;
+  return shortfall >= 31;
 }
 
-// Helper function to format time to 12-hour format
+// Helper function to check if late (15-30 minutes short of required hours)
+function isLateByHours(hoursRendered: string, requiredHours: number = 4) {
+  if (hoursRendered === "-") return false;
+  const [hoursStr, minutesStr] = hoursRendered.split('h ');
+  const hours = parseInt(hoursStr);
+  const minutes = parseInt(minutesStr);
+  
+  // Convert to total minutes for comparison
+  const totalMinutes = (hours * 60) + minutes;
+  const requiredMinutes = requiredHours * 60;
+  
+  // Late: 15 to 30 minutes short of required hours
+  const shortfall = requiredMinutes - totalMinutes;
+  return shortfall >= 15 && shortfall <= 30;
+}
+
+// Helper function to format time to 12-hour format with seconds
 function formatTime(time: string | null) {
   if (!time) return "Not recorded";
-  const [hours, minutes, seconds] = time.split(':').map(Number);
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const hour12 = hours % 12 || 12;
-  return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  
+  // Handle different time formats
+  let dateTime: Date;
+  if (time.includes('T')) {
+    // ISO format like "2025-10-05T23:17:59.000000Z"
+    dateTime = new Date(time);
+  } else if (time.includes(':')) {
+    // Time format like "23:17:59"
+    const [hours, minutes, seconds] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    const sec = seconds !== undefined ? seconds : 0;
+    return `${hour12}:${minutes.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')} ${period}`;
+  } else {
+    return time;
+  }
+  
+  return dateTime.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
 }
 
 // Helper function to determine attendance status
-function getAttendanceStatus(record: any) {
-  if (!record.clockIn && !record.clockOut) return "Absent";
-  const hoursRendered = getHoursRendered(record);
+function getAttendanceStatus(record: any, requiredHours: number = 4, workEndTime?: string) {
+  // 1. ABSENT: No clock in and clock out at all
+  if (!record.time_in && !record.time_out) {
+    return "Absent";
+  }
   
-  // If clocked in but not yet clocked out
-  if (record.clockIn && !record.clockOut) {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTime = currentHour + (currentMinute / 60);
-    
-    // Calculate expected clock out time (4 hours after clock in)
-    const clockInTime = record.clockIn;
-    const [time, period] = clockInTime.split(' ');
-    const [hours, minutes] = time.split(':').map(Number);
-    const hour24 = period === 'PM' ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
-    const clockInMinutes = (hour24 * 60) + minutes;
-    const expectedClockOutMinutes = clockInMinutes + (4 * 60); // 4 hours in minutes
-    const expectedClockOutHour = Math.floor(expectedClockOutMinutes / 60);
-    const expectedClockOutMinute = expectedClockOutMinutes % 60;
-    const expectedClockOutTime = expectedClockOutHour + (expectedClockOutMinute / 60);
-    
-    // If before expected clock out time, show as Present
-    if (currentTime < expectedClockOutTime) {
-      return "Present";
-    } else {
-      // After expected clock out time without clocking out, treat as Absent
-      return "Absent";
+  // 2. Clocked in but not yet clocked out - check if work hours are finished
+  if (record.time_in && !record.time_out) {
+    // Check if work hours have ended
+    if (workEndTime) {
+      const recordDate = new Date(record.date);
+      const today = new Date();
+      
+      // Only check if record is for today
+      const isToday = recordDate.getFullYear() === today.getFullYear() &&
+                      recordDate.getMonth() === today.getMonth() &&
+                      recordDate.getDate() === today.getDate();
+      
+      if (isToday) {
+        // Parse work end time (e.g., "16:30")
+        const [endHours, endMinutes] = workEndTime.split(':').map(Number);
+        const workEnd = new Date();
+        workEnd.setHours(endHours, endMinutes, 0, 0);
+        
+        const now = new Date();
+        
+        // If current time is past work end time, mark as Absent (forgot to clock out)
+        if (now > workEnd) {
+          return "Absent";
+        }
+      }
     }
-  }
-  
-  if (isUndertime(hoursRendered)) {
-    return "Undertime";
-  }
-  if (isLate(record.clockIn)) {
-    return "Late";
-  }
-  if (isAllowableClockIn(record.clockIn)) {
+    
+    // Work hours not finished yet or not today's record - still working
     return "Present";
   }
+  
+  // Calculate hours rendered
+  const hoursRendered = getHoursRendered(record);
+  
+  if (hoursRendered === "-") {
+    return "Absent";
+  }
+  
+  // 3. UNDERTIME: More than 1 hour short of required hours
+  if (isUndertime(hoursRendered, requiredHours)) {
+    return "Undertime";
+  }
+  
+  // 4. LATE: 15-60 minutes short of required hours
+  if (isLateByHours(hoursRendered, requiredHours)) {
+    return "Late";
+  }
+  
+  // 5. PRESENT: Rendered full hours or within 15 minutes of required hours
   return "Present";
 }
 
@@ -190,55 +269,137 @@ export default function AttendanceRecordsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null); // Start with no date selected
   const [isExporting, setIsExporting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<{ name: string; position: string } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<number | null>(null);
   const [showValidationModal, setShowValidationModal] = useState(false);
+  const [requiredWorkHours, setRequiredWorkHours] = useState<number>(6); // Default 6 hours
+  const [workEndTime, setWorkEndTime] = useState<string>("16:30"); // Default work end time
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Use shared attendance data
-  const [attendanceRecordsState, setAttendanceRecordsState] = useState(attendanceRecords);
+  // Use real attendance data from API
+  const { attendanceRecords: attendanceRecordsState, loading: attendanceLoading, loadAttendanceRecords } = useAttendance();
+
+  // Load work hours settings to calculate required work hours
+  useEffect(() => {
+    const fetchWorkHours = async () => {
+      try {
+        const response = await apiService.getWorkHours();
+        if (response.data) {
+          const data = response.data;
+          // Calculate required work hours from work_start to work_end
+          const workStart = data.work_start; // e.g., "10:30"
+          const workEnd = data.work_end; // e.g., "16:30"
+          
+          const [startHours, startMinutes] = workStart.split(':').map(Number);
+          const [endHours, endMinutes] = workEnd.split(':').map(Number);
+          
+          const startTotalMinutes = (startHours * 60) + startMinutes;
+          const endTotalMinutes = (endHours * 60) + endMinutes;
+          
+          const requiredMinutes = endTotalMinutes - startTotalMinutes;
+          const requiredHours = requiredMinutes / 60;
+          
+          setRequiredWorkHours(requiredHours);
+          setWorkEndTime(workEnd); // Save work end time for status calculation
+        }
+      } catch (error) {
+        console.error('Failed to fetch work hours:', error);
+        // Keep default 6 hours if fetch fails
+      }
+    };
+    
+    fetchWorkHours();
+  }, []);
+
+  // Load attendance records when date changes
+  useEffect(() => {
+    if (selectedDate) {
+      // Format date as YYYY-MM-DD in LOCAL timezone (not UTC) to avoid timezone shifts
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`;
+      
+      console.log('[AttendancePage] Selected date object:', selectedDate);
+      console.log('[AttendancePage] Loading records for date:', dateString);
+      loadAttendanceRecords({ date_from: dateString, date_to: dateString });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]); // Only depend on selectedDate, not loadAttendanceRecords to prevent infinite loops
 
   // Get unique positions and statuses for filter options
   const positions = useMemo(() => 
-    ["Admin", "Team Leader", "EPOL"],
+    ["Team Leader", "EPOL"],
     []
   );
 
-  const statuses = useMemo(() => 
-    Array.from(new Set(attendanceRecordsState.map(record => getAttendanceStatus(record)))),
-    [attendanceRecordsState]
-  );
+  const statuses = useMemo(() => {
+    // Always show all possible status options
+    const allStatusOptions = ["Present", "Absent", "Late", "Undertime"];
+    
+    // Get unique statuses from actual data
+    const dataStatuses = Array.from(new Set(attendanceRecordsState.map(record => getAttendanceStatus(record, requiredWorkHours, workEndTime))));
+    console.log('Data statuses:', dataStatuses);
+    console.log('Attendance records count:', attendanceRecordsState.length);
+    
+    // Return all possible status options
+    return allStatusOptions;
+  }, [attendanceRecordsState, requiredWorkHours, workEndTime]);
 
   // Filter records based on search query and selected filters
   const filteredRecords = useMemo(() => {
-    return attendanceRecordsState.filter(record => {
+    console.log('[AttendancePage] Filtering records...');
+    console.log('[AttendancePage] Total records in state:', attendanceRecordsState.length);
+    console.log('[AttendancePage] Selected date:', selectedDate);
+    
+    const filtered = attendanceRecordsState.filter(record => {
+      const employeeName = `${record.user?.first_name || ''} ${record.user?.last_name || ''}`.trim();
+      const employeeRole = record.user?.role || '';
+      
       const matchesSearch = !searchQuery || 
-        record.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        record.position.toLowerCase().includes(searchQuery.toLowerCase());
+        employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        employeeRole.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesPosition = !selectedPosition || record.position === selectedPosition;
+      const positionMap: Record<string, string> = {
+        'epol': 'EPOL',
+        'team_leader': 'Team Leader',
+        'street_sweeper': 'Street Sweeper',
+        'admin': 'Admin'
+      };
+      const recordPosition = positionMap[employeeRole] || employeeRole;
+      const matchesPosition = !selectedPosition || recordPosition === selectedPosition;
       
-      const recordStatus = getAttendanceStatus(record);
+      const recordStatus = getAttendanceStatus(record, requiredWorkHours, workEndTime);
       const matchesStatus = !selectedStatus || recordStatus === selectedStatus;
       
-      // Check if record date matches selected date
-      const recordDate = new Date(record.date);
-      const matchesDate = !selectedDate || (
-        recordDate.getFullYear() === selectedDate.getFullYear() &&
-        recordDate.getMonth() === selectedDate.getMonth() &&
-        recordDate.getDate() === selectedDate.getDate()
-      );
+      // Check if record date matches selected date (compare date strings to avoid timezone issues)
+      const recordDateString = record.date.split('T')[0]; // Extract "2025-10-09" from "2025-10-09T00:00:00.000Z"
+      
+      // Format selected date in LOCAL timezone (not UTC) to avoid timezone shifts
+      const selectedDateString = selectedDate 
+        ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+        : null;
+      
+      // If no date is selected, don't show any records
+      const matchesDate = selectedDateString ? recordDateString === selectedDateString : false;
+      
+      if (selectedDate && record === attendanceRecordsState[0]) {
+        console.log('[AttendancePage] Date comparison - Record:', recordDateString, '| Selected:', selectedDateString, '| Matches:', matchesDate);
+      }
       
       return matchesSearch && matchesPosition && matchesStatus && matchesDate;
     });
-  }, [attendanceRecordsState, searchQuery, selectedPosition, selectedStatus, selectedDate]);
+    
+    console.log('[AttendancePage] Filtered records count:', filtered.length);
+    return filtered;
+  }, [attendanceRecordsState, searchQuery, selectedPosition, selectedStatus, selectedDate, requiredWorkHours, workEndTime]);
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
@@ -253,13 +414,32 @@ export default function AttendanceRecordsPage() {
 
   // Filter records for selected employee
   const selectedEmployeeRecords = selectedEmployee
-    ? attendanceRecordsState.filter((rec) => rec.name === selectedEmployee.name)
+    ? attendanceRecordsState.filter((rec) => {
+        const employeeName = `${rec.user?.first_name || ''} ${rec.user?.last_name || ''}`.trim();
+        return employeeName === selectedEmployee.name;
+      })
     : [];
+
+  // Transform API records to the format expected by PDF export
+  const transformRecordsForExport = (records: any[]) => {
+    return records.map(record => ({
+      id: record.id,
+      name: `${record.user?.first_name || ''} ${record.user?.last_name || ''}`.trim(),
+      position: record.user?.role === 'epol' ? 'EPOL Officer' : 
+               record.user?.role === 'team_leader' ? 'Team Leader' : 
+               record.user?.role === 'street_sweeper' ? 'Street Sweeper' : 
+               record.user?.role || 'Officer',
+      date: record.date,
+      clockIn: record.time_in,
+      clockOut: record.time_out,
+      status: record.status || 'Present'
+    }));
+  };
 
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-      await generateAttendancePDF(filteredRecords);
+      await generateAttendancePDF(transformRecordsForExport(filteredRecords));
       // Set a timeout to reset the isExporting state to allow time for PDF generation
       setTimeout(() => setIsExporting(false), 2000);
     } catch (error) {
@@ -275,26 +455,27 @@ export default function AttendanceRecordsPage() {
 
   const confirmDelete = () => {
     if (recordToDelete) {
-      // Remove the record from the state
-      setAttendanceRecordsState(prevRecords => 
-        prevRecords.filter(record => record.id !== recordToDelete)
-      );
-      // Close the modal and reset the record to delete
+      // Note: In a real implementation, you would call an API to delete the record
+      // For now, we'll just close the modal
       setShowDeleteModal(false);
       setRecordToDelete(null);
+      // Refresh the attendance records from the API
+      loadAttendanceRecords();
     }
   };
 
   const hasActiveFilters = selectedPosition || selectedStatus;
 
-  // Calculate summary statistics
-  const attendanceSummary = {
-    totalRecords: attendanceRecordsState.length,
-    presentCount: attendanceRecordsState.filter(record => getAttendanceStatus(record) === "Present").length,
-    absentCount: attendanceRecordsState.filter(record => getAttendanceStatus(record) === "Absent").length,
-    lateCount: attendanceRecordsState.filter(record => getAttendanceStatus(record) === "Late").length,
-    undertimeCount: attendanceRecordsState.filter(record => getAttendanceStatus(record) === "Undertime").length,
-  };
+  // Calculate summary statistics based on selected date and filtered records
+  const attendanceSummary = useMemo(() => {
+    return {
+      totalRecords: filteredRecords.length,
+      presentCount: filteredRecords.filter(record => getAttendanceStatus(record, requiredWorkHours, workEndTime) === "Present").length,
+      absentCount: filteredRecords.filter(record => getAttendanceStatus(record, requiredWorkHours, workEndTime) === "Absent").length,
+      lateCount: filteredRecords.filter(record => getAttendanceStatus(record, requiredWorkHours, workEndTime) === "Late").length,
+      undertimeCount: filteredRecords.filter(record => getAttendanceStatus(record, requiredWorkHours, workEndTime) === "Undertime").length,
+    };
+  }, [filteredRecords, requiredWorkHours, workEndTime]);
 
   return (
     <div>
@@ -564,45 +745,59 @@ export default function AttendanceRecordsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentRecords.length > 0 ? currentRecords.map((record) => {
                   const hoursRendered = getHoursRendered(record);
-                  const status = getAttendanceStatus(record);
+                  const status = getAttendanceStatus(record, requiredWorkHours, workEndTime);
                   const statusColor = getStatusColor(status);
+                  const employeeName = `${record.user?.first_name || ''} ${record.user?.last_name || ''}`.trim();
+                  const positionMap: Record<string, string> = {
+                    'epol': 'EPOL',
+                    'team_leader': 'Team Leader',
+                    'street_sweeper': 'Street Sweeper',
+                    'admin': 'Admin'
+                  };
+                  const recordPosition = positionMap[record.user?.role || ''] || record.user?.role || '';
                   
                   return (
                     <tr key={record.id} className="hover:bg-gray-50 transition-colors duration-150">
                       <td className="py-4 px-6">
-                        <div className="font-semibold text-gray-900">{record.name}</div>
+                        <div className="font-semibold text-gray-900">{employeeName}</div>
                         <div className="text-sm text-gray-500">ID: {record.id}</div>
                       </td>
                       <td className="py-4 px-6">
                         <span
-                          className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getPositionColor(record.position)}`}
+                          className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ${getPositionColor(recordPosition)}`}
                         >
-                          {record.position}
+                          {recordPosition}
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <span className="font-medium text-gray-900">{record.date}</span>
+                        <span className="font-medium text-gray-900">
+                          {new Date(record.date).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                          })}
+                        </span>
                       </td>
                       <td className="py-4 px-6">
-                        {record.clockIn ? (
-                          <span className={`font-medium ${isLate(record.clockIn) ? 'text-red-600' : 'text-green-600'}`}>
-                            {formatTime(record.clockIn)}
+                        {record.time_in ? (
+                          <span className={`font-medium ${isLate(record.time_in) ? 'text-red-600' : 'text-green-600'}`}>
+                            {formatTime(record.time_in)}
                           </span>
                         ) : (
                           <span className="text-gray-400">Not recorded</span>
                         )}
                       </td>
                       <td className="py-4 px-6">
-                        {record.clockOut ? (
+                        {record.time_out ? (
                           <span className="font-medium text-blue-600">
-                            {formatTime(record.clockOut)}
+                            {formatTime(record.time_out)}
                           </span>
                         ) : (
                           <span className="text-gray-400">Not recorded</span>
                         )}
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`font-semibold ${isUndertime(hoursRendered) ? 'text-red-600' : 'text-green-600'}`}>
+                        <span className={`font-semibold ${isUndertime(hoursRendered, requiredWorkHours) || isLateByHours(hoursRendered, requiredWorkHours) ? 'text-red-600' : 'text-green-600'}`}>
                           {hoursRendered}
                         </span>
                       </td>
@@ -620,7 +815,7 @@ export default function AttendanceRecordsPage() {
                             size="sm"
                             className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
                             onClick={() => {
-                              setSelectedEmployee({ name: record.name, position: record.position });
+                              setSelectedEmployee({ name: employeeName, position: recordPosition });
                               setModalOpen(true);
                             }}
                           >
@@ -712,7 +907,7 @@ export default function AttendanceRecordsPage() {
         onClose={() => setModalOpen(false)}
         employeeName={selectedEmployee?.name || ""}
         employeePosition={selectedEmployee?.position || ""}
-        attendanceRecords={attendanceRecordsState}
+        attendanceRecords={transformRecordsForExport(selectedEmployeeRecords)}
       />
 
       {/* Delete Confirmation Modal */}
@@ -755,158 +950,7 @@ export default function AttendanceRecordsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6">
-            {/* Current date validation data - filtered to show only team leader validations for street sweepers */}
-            <div className="space-y-4">
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-                      <span className="text-white font-semibold text-sm">JD</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">John Doe</h3>
-                      <p className="text-sm text-gray-600">Street Sweeper</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-gray-500">{new Date().toLocaleDateString()} 2:30 PM</span>
-                    <p className="text-xs text-red-600 font-medium">
-                      {(() => {
-                        try {
-                          // In real implementation, this would get the validator name from the validation data
-                          const validatorName = null; // This would come from your backend/AsyncStorage
-                          if (validatorName) {
-                            return `Validated by ${validatorName}`;
-                          } else {
-                            throw new Error('Validator name not found');
-                          }
-                        } catch (error) {
-                          return 'Coconnect pa';
-                        }
-                      })()}
-                    </p>
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900 mb-2">Validation Remarks:</h4>
-                  <p className="text-sm text-gray-700 bg-white p-3 rounded border">
-                    Street sweeper arrived on time and completed assigned route. All designated areas were properly cleaned. 
-                    Equipment was used correctly and safety protocols were followed. No issues observed during validation.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Evidence Photo:</h4>
-                  <div className="flex justify-center">
-                    <div className="bg-gray-200 rounded-lg p-4 text-center w-32">
-                      <div className="h-20 w-full bg-gray-300 rounded flex items-center justify-center">
-                        <span className="text-gray-500 text-sm">Photo</span>
-                      </div>
-                      <p className="text-xs text-gray-600 mt-1">Work hours evidence</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-green-600 flex items-center justify-center">
-                      <span className="text-white font-semibold text-sm">SW</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Sam Williams</h3>
-                      <p className="text-sm text-gray-600">Street Sweeper</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-gray-500">{new Date().toLocaleDateString()} 3:45 PM</span>
-                    <p className="text-xs text-red-600 font-medium">
-                      {(() => {
-                        try {
-                          // In real implementation, this would get the validator name from the validation data
-                          const validatorName = null; // This would come from your backend/AsyncStorage
-                          if (validatorName) {
-                            return `Validated by ${validatorName}`;
-                          } else {
-                            throw new Error('Validator name not found');
-                          }
-                        } catch (error) {
-                          return 'Coconnect pa';
-                        }
-                      })()}
-                    </p>
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900 mb-2">Validation Remarks:</h4>
-                  <p className="text-sm text-gray-700 bg-white p-3 rounded border">
-                    Street sweeper performed excellent work on assigned route. All debris was properly collected and disposed of. 
-                    Work quality exceeded expectations. Safety equipment was properly worn throughout the shift.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Evidence Photo:</h4>
-                  <div className="flex justify-center">
-                    <div className="bg-gray-200 rounded-lg p-4 text-center w-32">
-                      <div className="h-20 w-full bg-gray-300 rounded flex items-center justify-center">
-                        <span className="text-gray-500 text-sm">Photo</span>
-                      </div>
-                      <p className="text-xs text-gray-600 mt-1">Work hours evidence</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-orange-600 flex items-center justify-center">
-                      <span className="text-white font-semibold text-sm">TB</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Taylor Brown</h3>
-                      <p className="text-sm text-gray-600">Street Sweeper</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-gray-500">{new Date().toLocaleDateString()} 4:20 PM</span>
-                    <p className="text-xs text-red-600 font-medium">
-                      {(() => {
-                        try {
-                          // In real implementation, this would get the validator name from the validation data
-                          const validatorName = null; // This would come from your backend/AsyncStorage
-                          if (validatorName) {
-                            return `Validated by ${validatorName}`;
-                          } else {
-                            throw new Error('Validator name not found');
-                          }
-                        } catch (error) {
-                          return 'Coconnect pa';
-                        }
-                      })()}
-                    </p>
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900 mb-2">Validation Remarks:</h4>
-                  <p className="text-sm text-gray-700 bg-white p-3 rounded border">
-                    Street sweeper completed assigned tasks efficiently. Work area was left clean and organized. 
-                    All safety protocols were followed correctly. Minor improvement needed in time management.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Evidence Photo:</h4>
-                  <div className="flex justify-center">
-                    <div className="bg-gray-200 rounded-lg p-4 text-center w-32">
-                      <div className="h-20 w-full bg-gray-300 rounded flex items-center justify-center">
-                        <span className="text-gray-500 text-sm">Photo</span>
-                      </div>
-                      <p className="text-xs text-gray-600 mt-1">Work hours evidence</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ValidationDataComponent selectedDate={selectedDate} />
           </div>
           <DialogFooter className="pt-4 border-t border-gray-200">
             <Button variant="outline" onClick={() => setShowValidationModal(false)} className="bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700">
@@ -917,4 +961,130 @@ export default function AttendanceRecordsPage() {
       </Dialog>
     </div>
   );
-} 
+}
+
+// Validation Data Component
+function ValidationDataComponent({ selectedDate }: { selectedDate: Date | null }) {
+  const [validations, setValidations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchValidations = async () => {
+      try {
+        setLoading(true);
+        const date = selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        const response = await apiService.getAttendanceValidations({ date });
+        
+        if (response.data) {
+          setValidations(response.data.data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching validations:', err);
+        setError('Failed to load validation data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchValidations();
+  }, [selectedDate]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2 text-gray-600">Loading validations...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <p className="text-red-600">{error}</p>
+      </div>
+    );
+  }
+
+  if (validations.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-600">No validation records found for the selected date.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {validations.map((validation, index) => {
+        const employee = validation.attendance_record?.user;
+        const validator = validation.validated_by;
+        const initials = employee ? 
+          `${employee.first_name?.charAt(0) || ''}${employee.last_name?.charAt(0) || ''}` : '??';
+        
+        return (
+          <div key={validation.id || index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
+                  <span className="text-white font-semibold text-sm">{initials}</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">
+                    {employee ? `${employee.first_name} ${employee.last_name}` : 'Unknown Employee'}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {employee?.role === 'epol' ? 'Street Sweeper' : employee?.role || 'Employee'}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-gray-500">
+                  {new Date(validation.validated_at).toLocaleDateString()} {new Date(validation.validated_at).toLocaleTimeString()}
+                </span>
+                <p className="text-xs text-blue-600 font-medium">
+                  Validated by {validator ? `${validator.first_name} ${validator.last_name}` : 'Unknown'}
+                </p>
+              </div>
+            </div>
+            <div className="mb-3">
+              <h4 className="font-medium text-gray-900 mb-2">Validation Remarks:</h4>
+              <p className="text-sm text-gray-700 bg-white p-3 rounded border">
+                {validation.notes || 'No remarks provided'}
+              </p>
+            </div>
+            {validation.evidence && validation.evidence.length > 0 && (
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Evidence Photos:</h4>
+                <div className="flex gap-2 flex-wrap">
+                  {validation.evidence.map((evidence: string, evidenceIndex: number) => (
+                    <div key={evidenceIndex} className="bg-gray-200 rounded-lg p-2 text-center w-24">
+                      <div className="h-16 w-full bg-gray-300 rounded flex items-center justify-center">
+                        <span className="text-gray-500 text-xs">Photo</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">Evidence {evidenceIndex + 1}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="mt-3 flex items-center gap-2">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                validation.status === 'approved' 
+                  ? 'bg-green-100 text-green-800' 
+                  : validation.status === 'rejected'
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {validation.status?.charAt(0).toUpperCase() + validation.status?.slice(1) || 'Pending'}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

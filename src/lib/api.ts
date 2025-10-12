@@ -36,6 +36,16 @@ class ApiService {
     }
   }
 
+  isAuthenticated() {
+    this.loadToken();
+    return !!this.token;
+  }
+
+  shouldRedirectToLogin() {
+    if (typeof window === 'undefined') return false;
+    return !this.isAuthenticated() && window.location.pathname.startsWith('/dashboard');
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -48,8 +58,15 @@ class ApiService {
       ...(options.headers as Record<string, string>),
     };
 
+    // Reload token from localStorage in case it was updated
+    this.loadToken();
+
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
+    } else {
+      // If no token is available, just throw an error without redirecting
+      // The contexts should handle this gracefully
+      throw new Error('Authentication required. Please log in.');
     }
 
     try {
@@ -61,6 +78,11 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle specific authentication errors
+        if (response.status === 401) {
+          this.handleAuthenticationFailure();
+          throw new Error('Session expired. Please log in again.');
+        }
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
 
@@ -68,6 +90,18 @@ class ApiService {
     } catch (error) {
       console.error('API request failed:', error);
       throw error;
+    }
+  }
+
+  private handleAuthenticationFailure() {
+    // Clear tokens and admin data
+    this.clearToken();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('epol_admin');
+      // Only redirect if we're not already on the login page and we're on a protected route
+      if (window.location.pathname !== '/' && window.location.pathname.startsWith('/dashboard')) {
+        window.location.href = '/';
+      }
     }
   }
 
@@ -107,6 +141,10 @@ class ApiService {
 
 
   async getCurrentUser() {
+    // Check if user is authenticated before making the request
+    if (!this.isAuthenticated()) {
+      throw new Error('Authentication required. Please log in.');
+    }
     return this.request<any>('/auth/user');
   }
 
@@ -154,11 +192,10 @@ class ApiService {
     return this.request<any>(`/password-resets${queryString}`);
   }
 
-  async approvePasswordReset(id: string, newPassword: string, adminNotes?: string) {
+  async approvePasswordReset(id: string, adminNotes?: string) {
     return this.request<any>(`/password-resets/${id}/approve`, {
       method: 'PUT',
       body: JSON.stringify({ 
-        new_password: newPassword,
         admin_notes: adminNotes 
       }),
     });
@@ -168,6 +205,12 @@ class ApiService {
     return this.request<any>(`/password-resets/${id}/reject`, {
       method: 'PUT',
       body: JSON.stringify({ admin_notes: adminNotes }),
+    });
+  }
+
+  async deletePasswordReset(id: string) {
+    return this.request<any>(`/password-resets/${id}`, {
+      method: 'DELETE',
     });
   }
 
@@ -299,13 +342,13 @@ class ApiService {
 
   async markIncidentOngoing(id: string) {
     return this.request<any>(`/incident-reports/${id}/mark-ongoing`, {
-      method: 'POST',
+      method: 'PUT',
     });
   }
 
   async markIncidentResolved(id: string) {
     return this.request<any>(`/incident-reports/${id}/mark-resolved`, {
-      method: 'POST',
+      method: 'PUT',
     });
   }
 
@@ -328,6 +371,12 @@ class ApiService {
     }
 
     return response.json();
+  }
+
+  async deleteIncidentReport(id: string) {
+    return this.request<any>(`/incident-reports/${id}`, {
+      method: 'DELETE',
+    });
   }
 
   // Attendance
@@ -412,6 +461,19 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Work Hours Settings
+  async getWorkHours() {
+    return this.request<any>('/work-hours');
+  }
+
+  async updateWorkHours(workHoursData: any) {
+    return this.request<any>('/work-hours', {
+      method: 'PUT',
+      body: JSON.stringify(workHoursData),
+    });
+  }
+
 }
 
 export const apiService = new ApiService();

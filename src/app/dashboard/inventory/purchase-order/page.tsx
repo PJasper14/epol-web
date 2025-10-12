@@ -23,6 +23,7 @@ export default function PurchaseOrderPage() {
   
   // State for the form
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
+  
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -62,13 +63,21 @@ export default function PurchaseOrderPage() {
   
   // Handle adding an item to the order
   const handleAddItem = () => {
-    if (!selectedItemId || quantity <= 0) return;
+    if (!selectedItemId || quantity <= 0) {
+      return;
+    }
     
-    const inventoryItem = inventoryItems.find(item => item.id === selectedItemId);
-    if (!inventoryItem) return;
+    const inventoryItem = inventoryItems.find(item => 
+      item.id.toString() === selectedItemId || 
+      (typeof item.id === 'number' && item.id === parseInt(selectedItemId))
+    );
+    
+    if (!inventoryItem) {
+      return;
+    }
     
     // Check if item already exists in the list
-    const existingIndex = items.findIndex(item => item.itemId === selectedItemId);
+    const existingIndex = items.findIndex(item => item.itemId === selectedItemId || item.itemId === inventoryItem.id.toString());
     
     if (existingIndex >= 0) {
       // Update existing item
@@ -77,12 +86,13 @@ export default function PurchaseOrderPage() {
       setItems(newItems);
     } else {
       // Add new item
-      setItems([...items, {
-        itemId: inventoryItem.id,
+      const newItem = {
+        itemId: inventoryItem.id.toString(),
         itemName: inventoryItem.name,
         quantity: quantity,
         unit: inventoryItem.unit
-      }]);
+      };
+      setItems([...items, newItem]);
     }
     
     // Reset selection
@@ -313,7 +323,7 @@ export default function PurchaseOrderPage() {
           </div>
           
           <div>
-            <Card className="mb-6 border-l-4 border-l-green-500 bg-white shadow-lg">
+            <Card className="mb-6 border-l-4 border-l-green-500 bg-white shadow-lg hover:shadow-xl transition-all duration-200">
               <CardHeader className="bg-gradient-to-r from-green-50 to-green-100 rounded-t-lg border-b border-green-200">
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-green-600 flex items-center justify-center shadow-md">
@@ -327,46 +337,60 @@ export default function PurchaseOrderPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-500">Item</label>
-                    <select 
-                      className="w-full border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500"
-                      value={selectedItemId}
-                      onChange={(e) => setSelectedItemId(e.target.value)}
-                    >
-                      <option value="">Select an item...</option>
-                      {inventoryItems.map(item => (
-                        <option key={item.id} value={item.id}>
-                          {item.name} ({item.unit})
-                        </option>
-                      ))}
-                    </select>
+              <CardContent className="p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-gray-700">Item</label>
+                    <div className="relative">
+                      <select 
+                        className="w-full h-12 pl-4 pr-8 py-3 border border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all duration-200 bg-white appearance-none"
+                        value={selectedItemId}
+                        onChange={(e) => setSelectedItemId(e.target.value)}
+                      >
+                        <option value="">Select an item...</option>
+                        {inventoryItems.length === 0 ? (
+                          <option value="" disabled>Loading inventory items...</option>
+                        ) : (
+                          inventoryItems.map(item => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} ({item.unit})
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-500">Quantity</label>
-                    <Input 
-                      type="number" 
-                      min="1" 
-                      value={quantity} 
-                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                    />
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-gray-700">Quantity</label>
+                    <div className="relative">
+                      <input 
+                        type="number" 
+                        min="1" 
+                        value={quantity} 
+                        onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                        className="w-full h-12 pl-4 pr-4 py-3 border border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all duration-200 bg-white"
+                      />
+                    </div>
                   </div>
                 </div>
                 <Button 
                   type="button" 
                   onClick={handleAddItem}
                   disabled={!selectedItemId || quantity <= 0}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-5 w-5 mr-2" />
                   Add Item
                 </Button>
               </CardContent>
             </Card>
             
-            <Card className="border-l-4 border-l-red-500 bg-white shadow-lg">
+            <Card className="border-l-4 border-l-red-500 bg-white shadow-lg hover:shadow-xl transition-all duration-200">
               <CardHeader className="bg-gradient-to-r from-red-50 to-red-100 rounded-t-lg border-b border-red-200">
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-red-600 flex items-center justify-center shadow-md">
@@ -389,9 +413,9 @@ export default function PurchaseOrderPage() {
                   </div>
                 ) : (
                   <div>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
                       <table className="w-full">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                           <tr className="border-b border-gray-200">
                             <th className="text-left py-4 px-6 font-semibold text-gray-900 text-sm uppercase tracking-wider">
                               Item
@@ -406,12 +430,12 @@ export default function PurchaseOrderPage() {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {items.map((item, index) => (
-                            <tr key={`order-item-${item.itemId}-${index}`} className="hover:bg-gray-50 transition-colors duration-150">
+                            <tr key={`order-item-${item.itemId}-${index}`} className="hover:bg-gray-50 transition-all duration-200 border-b border-gray-100">
                               <td className="py-4 px-6">
                                 <div className="font-semibold text-gray-900">{item.itemName}</div>
                               </td>
                               <td className="py-4 px-6 text-center">
-                                <span className="font-medium text-gray-900">{item.quantity} {item.unit}</span>
+                                <span className="font-medium text-gray-900 bg-gray-100 px-3 py-1 rounded-full text-sm">{item.quantity} {item.unit}</span>
                               </td>
                               <td className="py-4 px-6 text-center">
                                 <Button
@@ -419,7 +443,7 @@ export default function PurchaseOrderPage() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => handleRemoveItem(index)}
-                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-all duration-200"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>

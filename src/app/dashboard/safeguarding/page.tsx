@@ -59,7 +59,7 @@ const getPriorityFromIncidentType = (incidentType: string): string => {
 };
 
 export default function SafeguardingRecordsPage() {
-  const { incidents, deleteIncident } = useIncidentContext();
+  const { incidents, loading, error, deleteIncident, refreshIncidents } = useIncidentContext();
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -157,6 +157,32 @@ export default function SafeguardingRecordsPage() {
     }
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh] p-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-red-600 border-t-transparent mb-4"></div>
+        <p className="text-gray-500">Loading incident reports...</p>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh] p-4">
+        <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+          <ShieldAlert className="h-8 w-8 text-red-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-700 mb-2">Error Loading Reports</h2>
+        <p className="text-gray-500 mb-6 text-center">{error}</p>
+        <Button onClick={refreshIncidents} className="bg-red-600 hover:bg-red-700 text-white">
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -165,12 +191,14 @@ export default function SafeguardingRecordsPage() {
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Safeguarding Records</h1>
             <p className="text-gray-500">Monitor and manage street sweeping incident reports</p>
           </div>
-          <Link href="/dashboard">
-            <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Home
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/dashboard">
+              <Button className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 px-6 py-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Home
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 

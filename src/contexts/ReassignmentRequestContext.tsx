@@ -43,7 +43,7 @@ const convertApiRequestToUI = (apiRequest: ApiReassignmentRequest): Reassignment
     currentLocation: apiRequest.current_location?.name || 'Unknown Location',
     requestedLocation: apiRequest.requested_location?.name || 'Unknown Location',
     reason: apiRequest.reason,
-    requestDate: new Date(apiRequest.created_at).toISOString().split('T')[0],
+    requestDate: new Date(apiRequest.created_at).toLocaleString(),
     status: apiRequest.status,
     reviewNotes: apiRequest.admin_notes,
     reviewedBy: apiRequest.processed_by ? `${apiRequest.processed_by.first_name} ${apiRequest.processed_by.last_name}` : undefined,

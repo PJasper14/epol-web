@@ -3,7 +3,6 @@
 import Sidebar from "@/components/ui/sidebar";
 import Footer from "@/components/ui/footer";
 import { useAdmin } from "@/contexts/AdminContext";
-import { LocationProvider } from "@/contexts/LocationContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -47,16 +46,14 @@ export default function DashboardLayout({
   }
 
   return (
-    <LocationProvider>
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <Sidebar />
-        <div className="ml-64 flex-1 flex flex-col">
-          <main className="p-6 flex-1">
-            {children}
-          </main>
-          <Footer />
-        </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <Sidebar />
+      <div className="ml-64 flex-1 flex flex-col">
+        <main className="p-6 flex-1">
+          {children}
+        </main>
+        <Footer />
       </div>
-    </LocationProvider>
+    </div>
   );
 } 

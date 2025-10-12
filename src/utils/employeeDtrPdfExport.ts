@@ -12,40 +12,62 @@ interface AttendanceRecord {
   hoursRendered?: string;
 }
 
+// Helper function to format date
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+// Helper function to format time
+function formatTime(timeStr: string | null) {
+  if (!timeStr) return "Not recorded";
+  
+  const date = new Date(timeStr);
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+}
+
 // Helper functions (same as in modal)
 function getHoursRendered(record: AttendanceRecord) {
   if (!record.clockIn || !record.clockOut) return "-";
-  const convertTo24Hour = (timeStr: string) => {
-    const [time, period] = timeStr.split(' ');
-    const [hours, minutes] = time.split(':').map(Number);
-    const hour24 = period === 'PM' ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
-    return { hours: hour24, minutes };
-  };
-  const clockIn = convertTo24Hour(record.clockIn);
-  const clockOut = convertTo24Hour(record.clockOut);
-  const clockInMinutes = (clockIn.hours * 60) + clockIn.minutes;
-  const clockOutMinutes = (clockOut.hours * 60) + clockOut.minutes;
-  const totalMinutes = clockOutMinutes - clockInMinutes;
+  
+  // Parse ISO timestamps
+  const clockInTime = new Date(record.clockIn);
+  const clockOutTime = new Date(record.clockOut);
+  
+  // Calculate difference in milliseconds, then convert to minutes
+  const diffMs = clockOutTime.getTime() - clockInTime.getTime();
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
+  
   return `${hours}h ${minutes}m`;
 }
 function isAllowableClockIn(clockIn: string | null) {
   if (!clockIn) return false;
-  const [time, period] = clockIn.split(' ');
-  const [hours, minutes] = time.split(':').map(Number);
-  const hour24 = period === 'PM' ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
-  if (hour24 === 14) {
+  const date = new Date(clockIn);
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  if (hours === 14) {
     return minutes >= 20 && minutes <= 30;
   }
   return false;
 }
 function isLate(clockIn: string | null) {
   if (!clockIn) return false;
-  const [time, period] = clockIn.split(' ');
-  const [hours, minutes] = time.split(':').map(Number);
-  const hour24 = period === 'PM' ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
-  return hour24 > 14 || (hour24 === 14 && minutes > 30);
+  const date = new Date(clockIn);
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  return hours > 14 || (hours === 14 && minutes > 30);
 }
 function isUndertime(hoursRendered: string) {
   if (hoursRendered === "-") return false;
@@ -176,9 +198,9 @@ export async function exportEmployeeDTR({
     let tableStartY = summaryY + 10;
     // Prepare table data
     const tableData = records.map((rec) => [
-      rec.date,
-      rec.clockIn || 'Not recorded',
-      rec.clockOut || 'Not recorded',
+      formatDate(rec.date),
+      formatTime(rec.clockIn),
+      formatTime(rec.clockOut),
       getHoursRendered(rec),
       getAttendanceStatus(rec),
     ]);
@@ -256,9 +278,9 @@ export async function exportEmployeeDTR({
     let tableStartY = 73;
     // ... rest of the code as above ...
     const tableData = records.map((rec) => [
-      rec.date,
-      rec.clockIn || 'Not recorded',
-      rec.clockOut || 'Not recorded',
+      formatDate(rec.date),
+      formatTime(rec.clockIn),
+      formatTime(rec.clockOut),
       getHoursRendered(rec),
       getAttendanceStatus(rec),
     ]);

@@ -8,7 +8,6 @@ export interface PasswordResetRequest {
   id: string;
   user_id: string;
   user_name: string;
-  user_email: string;
   user_phone: string;
   requested_at: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -22,7 +21,6 @@ export interface PasswordResetRequest {
     id: string;
     first_name: string;
     last_name: string;
-    email: string;
     phone: string;
   };
 }
@@ -35,7 +33,7 @@ interface PasswordResetContextType {
   addRequest: (request: PasswordResetRequest) => void;
   updateRequest: (id: string, updates: Partial<PasswordResetRequest>) => void;
   deleteRequest: (id: string) => void;
-  approveRequest: (id: string, newPassword: string, adminNotes?: string) => Promise<void>;
+  approveRequest: (id: string, adminNotes?: string) => Promise<void>;
   rejectRequest: (id: string, adminNotes: string) => Promise<void>;
   refreshRequests: () => Promise<void>;
   getPendingCount: () => number;
@@ -49,7 +47,6 @@ const transformApiRequest = (apiRequest: any): PasswordResetRequest => {
     id: apiRequest.id.toString(),
     user_id: apiRequest.user_id.toString(),
     user_name: apiRequest.user ? `${apiRequest.user.first_name} ${apiRequest.user.last_name}` : 'Unknown User',
-    user_email: apiRequest.user?.email || 'N/A',
     user_phone: apiRequest.user?.phone || 'N/A',
     requested_at: apiRequest.created_at,
     status: apiRequest.status,
@@ -108,19 +105,24 @@ export function PasswordResetProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteRequest = async (id: string) => {
-    try {
-      // Note: Backend doesn't have delete endpoint, so we just remove from local state
-      setRequests(prev => prev.filter(request => request.id !== id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete request');
-    }
-  };
-
-  const approveRequest = async (id: string, newPassword: string, adminNotes?: string) => {
     setLoading(true);
     setError(null);
     try {
-      await apiService.approvePasswordReset(id, newPassword, adminNotes);
+      await apiService.deletePasswordReset(id);
+      await refreshRequests(); // Refresh to get updated data
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete request');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const approveRequest = async (id: string, adminNotes?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await apiService.approvePasswordReset(id, adminNotes);
       await refreshRequests(); // Refresh to get updated data
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to approve request');

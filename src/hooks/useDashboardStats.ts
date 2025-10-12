@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useInventory } from '@/contexts/InventoryContext';
 import { useIncidentContext } from '@/app/dashboard/safeguarding/IncidentContext';
-import { calculateAttendanceStats } from '@/data/attendanceData';
+import { useUser } from '@/contexts/UserContext';
+import { useAttendance } from '@/contexts/AttendanceContext';
+import { inventoryApi } from '@/services/inventoryApi';
 
 export interface DashboardStats {
   attendance: {
-    percentage: number;
-    present: number;
     total: number;
   };
   employees: {
@@ -21,6 +21,7 @@ export interface DashboardStats {
     total: number;
     lowStock: number;
     outOfStock: number;
+    pendingRequests: number;
   };
   incidents: {
     total: number;
@@ -34,62 +35,52 @@ export interface DashboardStats {
 export function useDashboardStats() {
   const { inventoryItems, getLowStockItems, getOutOfStockItems } = useInventory();
   const { incidents } = useIncidentContext();
+  const { users } = useUser();
+  const { getAttendanceStats } = useAttendance();
   const [stats, setStats] = useState<DashboardStats>({
-    attendance: { percentage: 0, present: 0, total: 0 },
+    attendance: { total: 0 },
     employees: { total: 0, active: 0 },
     accounts: { total: 0, active: 0 },
-    inventory: { total: 0, lowStock: 0, outOfStock: 0 },
+    inventory: { total: 0, lowStock: 0, outOfStock: 0, pendingRequests: 0 },
     incidents: { total: 0, pending: 0, ongoing: 0, resolved: 0, thisWeek: 0 }
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const calculateStats = async () => {
-      // Use real attendance data
-      const attendanceStats = calculateAttendanceStats();
+      // Use real attendance data from API for today's date
+      const today = new Date().toISOString().split('T')[0];
+      const attendanceStats = getAttendanceStats(today);
+      console.log('Dashboard Stats - Attendance for today:', today, attendanceStats);
 
-      // Mock employee data - in a real app, this would come from an API
-      const mockEmployeeData = [
-        { id: 1, name: "John Doe", status: "Active" },
-        { id: 2, name: "Jane Smith", status: "Active" },
-        { id: 3, name: "Alex Johnson", status: "Active" },
-        { id: 4, name: "Sam Williams", status: "Active" },
-        { id: 5, name: "Taylor Brown", status: "On Leave" },
-        { id: 6, name: "Jordan Lee", status: "Active" },
-        { id: 7, name: "Casey Green", status: "Active" },
-        { id: 8, name: "Riley White", status: "Active" },
-        { id: 9, name: "Michael Chen", status: "Active" },
-        { id: 10, name: "Sarah Wilson", status: "Active" },
-        { id: 11, name: "David Martinez", status: "Active" },
-        { id: 12, name: "Lisa Anderson", status: "Active" },
-        { id: 13, name: "Robert Taylor", status: "Active" },
-        { id: 14, name: "Maria Garcia", status: "Active" },
-        { id: 15, name: "James Rodriguez", status: "Active" }
-      ];
+      // Use real user data from UserContext - only count EPOL and Team Leader roles
+      const employeeUsers = users.filter(user => user.role === 'EPOL' || user.role === 'Team Leader');
+      const totalEmployees = employeeUsers.length;
+      const activeEmployees = employeeUsers.length; // All EPOL and Team Leader users are considered active employees
+      
+      // For accounts, we'll use the same user data but count all users (including admins)
+      const totalAccounts = users.length;
+      const activeAccounts = users.length; // All users in the system are considered active accounts
 
-      const activeEmployees = mockEmployeeData.filter(emp => emp.status === "Active").length;
-      const totalEmployees = mockEmployeeData.length;
+      // Real inventory data - filter from already-loaded inventory items instead of making new API calls
+      const lowStockItems = inventoryItems.filter(item => item.quantity <= item.threshold && item.quantity > 0);
+      const outOfStockItems = inventoryItems.filter(item => item.quantity === 0);
 
-      // Mock account data - in a real app, this would come from an API
-      const mockAccountData = [
-        { id: 1, username: "admin", status: "Active" },
-        { id: 2, username: "john.doe", status: "Active" },
-        { id: 3, username: "jane.smith", status: "Active" },
-        { id: 4, username: "alex.johnson", status: "Active" },
-        { id: 5, username: "sam.williams", status: "Active" }
-      ];
-
-      const activeAccounts = mockAccountData.filter(acc => acc.status === "Active").length;
-      const totalAccounts = mockAccountData.length;
-
-      // Real inventory data - await the async functions
-      const lowStockItems = await getLowStockItems();
-      const outOfStockItems = await getOutOfStockItems();
+      // Get pending inventory requests
+      let pendingRequestsCount = 0;
+      try {
+        const requestsResponse = await inventoryApi.getInventoryRequests({ status: 'pending' });
+        pendingRequestsCount = requestsResponse.data?.length || 0;
+      } catch (error) {
+        console.error('Error fetching pending inventory requests:', error);
+      }
 
       // Real incident data
+      console.log('Dashboard Stats - Total incidents:', incidents.length, incidents);
       const pendingIncidents = incidents.filter(inc => inc.status === "Pending").length;
       const ongoingIncidents = incidents.filter(inc => inc.status === "Ongoing").length;
       const resolvedIncidents = incidents.filter(inc => inc.status === "Resolved").length;
+      console.log('Dashboard Stats - Incident counts:', { pending: pendingIncidents, ongoing: ongoingIncidents, resolved: resolvedIncidents });
 
       // Calculate incidents this week
       const oneWeekAgo = new Date();
@@ -101,8 +92,6 @@ export function useDashboardStats() {
 
       setStats({
         attendance: {
-          percentage: attendanceStats.percentage,
-          present: attendanceStats.present,
           total: attendanceStats.total
         },
         employees: {
@@ -116,7 +105,8 @@ export function useDashboardStats() {
         inventory: {
           total: inventoryItems.length,
           lowStock: lowStockItems.length,
-          outOfStock: outOfStockItems.length
+          outOfStock: outOfStockItems.length,
+          pendingRequests: pendingRequestsCount
         },
         incidents: {
           total: incidents.length,
@@ -131,7 +121,7 @@ export function useDashboardStats() {
     };
 
     calculateStats();
-  }, [inventoryItems, incidents, getLowStockItems, getOutOfStockItems]);
+  }, [inventoryItems, incidents, users]); // Removed getAttendanceStats - it's a function, not data
 
   return { stats, loading };
 }

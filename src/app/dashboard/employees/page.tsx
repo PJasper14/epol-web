@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Users, 
   MapPin, 
@@ -26,7 +26,12 @@ import {
   ArrowLeft,
   User,
   X,
-  UserCheck
+  UserCheck,
+  Clock,
+  Save,
+  Check,
+  AlertCircle,
+  AlertTriangle
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -38,6 +43,7 @@ import { useReassignmentRequest } from "@/contexts/ReassignmentRequestContext";
 import { useUser } from "@/contexts/UserContext";
 import { useAssignment } from "@/contexts/AssignmentContext";
 import Link from "next/link";
+import { workHoursApi } from "@/services/workHoursApi";
 
 // Types for employee management
 interface Employee {
@@ -61,10 +67,49 @@ export default function EmployeeManagementPage() {
   const [showReassignmentModal, setShowReassignmentModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [showWorkHoursModal, setShowWorkHoursModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState("");
+  
+  // Work hours settings
+  const [workHours, setWorkHours] = useState({
+    clockInStart: "",
+    clockInEnd: "",
+    workStart: "",
+    workEnd: "",
+    clockOutTime: "",
+    extendedClockOutTime: ""
+  });
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+
+  // Load work hours from API on mount
+  useEffect(() => {
+    const loadWorkHours = async () => {
+      try {
+        const response = await workHoursApi.getWorkHours();
+        if (response.success && response.data) {
+          // Convert time format from "HH:MM:SS" to "HH:MM"
+          setWorkHours({
+            clockInStart: response.data.clock_in_start ? response.data.clock_in_start.substring(0, 5) : '',
+            clockInEnd: response.data.clock_in_end ? response.data.clock_in_end.substring(0, 5) : '',
+            workStart: response.data.work_start ? response.data.work_start.substring(0, 5) : '',
+            workEnd: response.data.work_end ? response.data.work_end.substring(0, 5) : '',
+            clockOutTime: response.data.clock_out_time ? response.data.clock_out_time.substring(0, 5) : '',
+            extendedClockOutTime: response.data.extended_clock_out_time ? response.data.extended_clock_out_time.substring(0, 5) : '',
+          });
+        }
+      } catch (error) {
+        console.error('Error loading work hours:', error);
+        // Keep empty values if API fails
+      }
+    };
+    
+    loadWorkHours();
+  }, []);
 
   // Convert users to employees and filter out Admin accounts
   const employees: Employee[] = users
@@ -349,6 +394,13 @@ export default function EmployeeManagementPage() {
                 )}
               </Button>
               <div className="flex gap-3">
+                <Button 
+                  onClick={() => setShowWorkHoursModal(true)}
+                  className="gap-2 bg-green-600 text-white hover:bg-green-700 shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  <Clock className="h-4 w-4" />
+                  <span>Work Hours Settings</span>
+                </Button>
                 <Link href="/dashboard/employees/locations">
                   <Button className="gap-2 bg-blue-600 text-white hover:bg-blue-700 shadow-md">
                     <MapPin className="h-4 w-4" />
@@ -650,134 +702,624 @@ export default function EmployeeManagementPage() {
 
       {/* Assignment Modal */}
       <Dialog open={showAssignmentModal} onOpenChange={setShowAssignmentModal}>
-        <DialogContent className="sm:max-w-[500px] bg-white border-gray-200 shadow-xl">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-green-600" />
-              Assign Employee
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Assign {selectedEmployee?.name} to a new location.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-[600px] bg-white border-gray-200 shadow-xl [&>button]:hidden">
+          <DialogHeader className="border-b border-gray-200 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg">
+                <MapPin className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl font-bold text-gray-900">Assign Employee</DialogTitle>
+                <DialogDescription className="text-gray-600 mt-1">
+                  Assign {selectedEmployee?.name} to a workplace location
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="grid gap-6 py-4">
+          
+          <div className="space-y-4 py-4">
+            {/* Employee Info Card */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="font-bold text-blue-900">{selectedEmployee?.name}</p>
+                  <p className="text-xs text-blue-700">{selectedEmployee?.position}</p>
+                </div>
+                {selectedEmployee?.currentLocationId ? (
+                  <div className="text-right">
+                    <p className="text-xs text-blue-600 font-medium">Currently At</p>
+                    <p className="text-sm font-semibold text-blue-900">
+                      {workplaceLocations.find(loc => loc.id === selectedEmployee.currentLocationId)?.name || 'Unassigned'}
+                    </p>
+                  </div>
+                ) : (
+                  <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                    Not Assigned
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Location Selection */}
             <div className="space-y-2">
-              <Label htmlFor="location" className="text-sm font-medium text-gray-700">Location *</Label>
+              <Label htmlFor="location" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                <MapPin className="h-4 w-4 text-green-600" />
+                Select Workplace Location <span className="text-red-500">*</span>
+              </Label>
               <Select value={newAssignment.locationId} onValueChange={(value) => setNewAssignment({ ...newAssignment, locationId: value })}>
-                <SelectTrigger className="border-gray-300 focus:border-red-500 focus:ring-red-500">
-                  <SelectValue placeholder="Select location" />
+                <SelectTrigger className="border-gray-300 focus:border-green-500 focus:ring-green-500 h-12">
+                  <SelectValue placeholder="Choose a location..." />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-gray-200">
-                  {workplaceLocations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
+                  {workplaceLocations.map((location) => {
+                    const employeesAtLocation = employees.filter(emp => emp.currentLocationId === location.id).length;
+                    return (
+                      <SelectItem key={location.id} value={location.id} className="py-3">
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-green-600" />
+                            <span className="font-medium">{location.name}</span>
+                          </div>
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            {employeesAtLocation} {employeesAtLocation === 1 ? 'employee' : 'employees'}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-gray-500 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Select the workplace location where this employee will be deployed
+              </p>
             </div>
+
+            {/* Selected Location Preview */}
+            {newAssignment.locationId && (
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4 animate-in slide-in-from-top">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                    <Check className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-green-900 mb-2 flex items-center gap-2">
+                      <span>Selected Location</span>
+                    </p>
+                    {(() => {
+                      const selectedLoc = workplaceLocations.find(loc => loc.id === newAssignment.locationId);
+                      return selectedLoc ? (
+                        <div className="space-y-1 text-xs">
+                          <p className="font-bold text-green-900 text-base">{selectedLoc.name}</p>
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <div className="bg-white/60 rounded p-2 border border-green-200">
+                              <p className="text-green-600 font-medium">Coordinates</p>
+                              <p className="text-green-900 font-mono text-xs">
+                                {selectedLoc.latitude.toFixed(4)}, {selectedLoc.longitude.toFixed(4)}
+                              </p>
+                            </div>
+                            <div className="bg-white/60 rounded p-2 border border-green-200">
+                              <p className="text-green-600 font-medium">Geofence</p>
+                              <p className="text-green-900 font-semibold">{selectedLoc.radius}m radius</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter className="pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => setShowAssignmentModal(false)} className="border-gray-300 hover:bg-gray-50">
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAssignEmployee} 
-              disabled={!newAssignment.locationId}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              Assign Employee
-            </Button>
+
+          <DialogFooter className="border-t border-gray-200 pt-4 flex items-center justify-between">
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              <span className="text-red-500">*</span> Required field
+            </p>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowAssignmentModal(false);
+                  setNewAssignment({ locationId: "" });
+                }} 
+                className="bg-red-600 hover:bg-red-700 text-white px-6 shadow-md"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAssignEmployee} 
+                disabled={!newAssignment.locationId}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Confirm Assignment
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Reassignment Modal */}
       <Dialog open={showReassignmentModal} onOpenChange={setShowReassignmentModal}>
-        <DialogContent className="sm:max-w-[500px] bg-white border-gray-200 shadow-xl">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <Edit className="h-5 w-5 text-blue-600" />
-              Reassign Employee
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Reassign {selectedEmployee?.name} to a new location.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-[650px] bg-white border-gray-200 shadow-xl [&>button]:hidden">
+          <DialogHeader className="border-b border-gray-200 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+                <Edit className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl font-bold text-gray-900">Reassign Employee</DialogTitle>
+                <DialogDescription className="text-gray-600 mt-1">
+                  Move {selectedEmployee?.name} to a different workplace location
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="grid gap-6 py-4">
+          
+          <div className="space-y-4 py-4">
+            {/* Employee Info Card */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="font-bold text-blue-900">{selectedEmployee?.name}</p>
+                  <p className="text-xs text-blue-700">{selectedEmployee?.position}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* New Location Selection */}
             <div className="space-y-2">
-              <Label htmlFor="location" className="text-sm font-medium text-gray-700">New Location *</Label>
+              <Label htmlFor="new-location" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                <MapPin className="h-4 w-4 text-blue-600" />
+                Select New Workplace Location <span className="text-red-500">*</span>
+              </Label>
               <Select value={newAssignment.locationId} onValueChange={(value) => setNewAssignment({ ...newAssignment, locationId: value })}>
-                <SelectTrigger className="border-gray-300 focus:border-red-500 focus:ring-red-500">
-                  <SelectValue placeholder="Select location" />
+                <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 h-12">
+                  <SelectValue placeholder="Choose a new location..." />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-gray-200">
-                  {workplaceLocations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
+                  {workplaceLocations
+                    .filter(loc => loc.id !== selectedEmployee?.currentLocationId)
+                    .map((location) => {
+                      const employeesAtLocation = employees.filter(emp => emp.currentLocationId === location.id).length;
+                      return (
+                        <SelectItem key={location.id} value={location.id} className="py-3">
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-blue-600" />
+                              <span className="font-medium">{location.name}</span>
+                            </div>
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              {employeesAtLocation} {employeesAtLocation === 1 ? 'employee' : 'employees'}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-gray-500 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Current location is excluded from the list
+              </p>
             </div>
+
+            {/* Visual FROM → TO Indicator */}
+            {selectedEmployee?.currentLocationId && newAssignment.locationId && (
+              <div className="flex items-center gap-3 px-4">
+                <div className="flex-1 bg-gray-100 rounded-lg p-3 border border-gray-300">
+                  <p className="text-xs text-gray-500 font-medium mb-1">FROM</p>
+                  <p className="font-semibold text-gray-900">
+                    {workplaceLocations.find(loc => loc.id === selectedEmployee.currentLocationId)?.name}
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <ArrowLeft className="h-5 w-5 text-blue-600 transform rotate-180" />
+                </div>
+                <div className="flex-1 bg-blue-100 rounded-lg p-3 border-2 border-blue-300">
+                  <p className="text-xs text-blue-600 font-medium mb-1">TO</p>
+                  <p className="font-semibold text-blue-900">
+                    {workplaceLocations.find(loc => loc.id === newAssignment.locationId)?.name}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Selected Location Preview */}
+            {newAssignment.locationId && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4 animate-in slide-in-from-top">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                    <Check className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                      <span>New Location Details</span>
+                    </p>
+                    {(() => {
+                      const selectedLoc = workplaceLocations.find(loc => loc.id === newAssignment.locationId);
+                      return selectedLoc ? (
+                        <div className="space-y-1 text-xs">
+                          <p className="font-bold text-blue-900 text-base">{selectedLoc.name}</p>
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <div className="bg-white/60 rounded p-2 border border-blue-200">
+                              <p className="text-blue-600 font-medium">Coordinates</p>
+                              <p className="text-blue-900 font-mono text-xs">
+                                {selectedLoc.latitude.toFixed(4)}, {selectedLoc.longitude.toFixed(4)}
+                              </p>
+                            </div>
+                            <div className="bg-white/60 rounded p-2 border border-blue-200">
+                              <p className="text-blue-600 font-medium">Geofence</p>
+                              <p className="text-blue-900 font-semibold">{selectedLoc.radius}m radius</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter className="pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => setShowReassignmentModal(false)} className="border-gray-300 hover:bg-gray-50">
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleReassignEmployee} 
-              disabled={!newAssignment.locationId}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Reassign Employee
-            </Button>
+
+          <DialogFooter className="border-t border-gray-200 pt-4 flex items-center justify-between">
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              <span className="text-red-500">*</span> Required field
+            </p>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowReassignmentModal(false);
+                  setNewAssignment({ locationId: "" });
+                }} 
+                className="bg-red-600 hover:bg-red-700 text-white px-6 shadow-md"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleReassignEmployee} 
+                disabled={!newAssignment.locationId}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Confirm Reassignment
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Assignment Confirmation Modal */}
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent className="sm:max-w-[500px] bg-white border-gray-200 shadow-xl">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <X className="h-5 w-5 text-red-600" />
-              Remove Location Assignment
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Are you sure you want to remove the location assignment for {selectedEmployee?.name}? This action cannot be undone.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-[600px] bg-white border-gray-200 shadow-xl [&>button]:hidden">
+          <DialogHeader className="pb-4 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                <AlertTriangle className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <DialogTitle className="text-2xl font-bold text-gray-900">
+                  Remove Assignment?
+                </DialogTitle>
+                <DialogDescription className="text-gray-600 text-sm mt-1">
+                  This will unassign the employee from their current location
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="py-4">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <X className="h-5 w-5 text-red-400" />
+          
+          <div className="space-y-4 py-4">
+            {/* Employee Info Card */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="font-bold text-blue-900">{selectedEmployee?.name}</p>
+                  <p className="text-xs text-blue-700">{selectedEmployee?.position}</p>
                 </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Warning
-                  </h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>This will remove the employee's current location assignment. They will appear as "No assignment" in the system.</p>
+              </div>
+            </div>
+
+            {/* Visual REMOVE Indicator */}
+            {selectedEmployee?.currentLocationId && (
+              <div className="flex items-center gap-3 px-4">
+                <div className="flex-1 bg-red-100 rounded-lg p-4 border-2 border-red-300">
+                  <p className="text-xs text-red-600 font-medium mb-2">REMOVING FROM</p>
+                  <div className="space-y-1">
+                    <p className="font-semibold text-red-900 text-lg">
+                      {workplaceLocations.find(loc => loc.id === selectedEmployee.currentLocationId)?.name}
+                    </p>
+                    {(() => {
+                      const location = workplaceLocations.find(loc => loc.id === selectedEmployee.currentLocationId);
+                      return location ? (
+                        <div className="flex gap-2 text-xs text-red-700">
+                          <span>{location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</span>
+                          <span>•</span>
+                          <span>{location.radius}m radius</span>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="h-12 w-12 rounded-full bg-red-500 flex items-center justify-center shadow-md">
+                    <ArrowLeft className="h-6 w-6 text-white transform rotate-180" />
+                  </div>
+                </div>
+                <div className="flex-1 bg-gray-100 rounded-lg p-4 border-2 border-gray-300 border-dashed">
+                  <p className="text-xs text-gray-500 font-medium mb-2">WILL BECOME</p>
+                  <p className="font-semibold text-gray-600 text-lg">No Assignment</p>
+                  <p className="text-xs text-gray-500 mt-1">Employee will not be assigned to any location</p>
+                </div>
+              </div>
+            )}
+
+            {/* Warning Box */}
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-yellow-800 mb-1">Important Notice</p>
+                  <p className="text-sm text-yellow-700">
+                    After removal, this employee will appear as "No assignment" in the system. They will not be able to clock in/out until assigned to a new location. This action cannot be undone.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
-          <DialogFooter className="pt-4 border-t border-gray-200">
+
+          <DialogFooter className="pt-4 border-t border-gray-200 flex items-center justify-end gap-2">
             <Button 
               variant="outline" 
               onClick={() => setShowDeleteModal(false)} 
-              className="border-gray-300 hover:bg-gray-50"
+              className="bg-gray-900 hover:bg-gray-800 text-white border-gray-900 px-6"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleDeleteAssignment}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-red-600 hover:bg-red-700 text-white px-6 shadow-lg"
             >
-              Remove Assignment
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Yes, Remove Assignment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Work Hours Settings Modal */}
+      <Dialog open={showWorkHoursModal} onOpenChange={setShowWorkHoursModal}>
+        <DialogContent className="sm:max-w-[550px] bg-white border-2 border-green-200 shadow-xl">
+          <DialogHeader className="pb-3 border-b border-green-100">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
+                <Clock className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-gray-900">
+                  Work Hours Settings
+                </DialogTitle>
+                <DialogDescription className="text-gray-500 text-xs">
+                  Set working hours and clock-in/out windows
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="grid gap-3 py-3">
+            {/* Clock-In Times */}
+            <div className="bg-green-50 rounded-md p-2.5 border border-green-200">
+              <h3 className="text-xs font-bold text-green-800 mb-1.5 flex items-center gap-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                Clock-In Window
+              </h3>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-0.5">
+                  <Label htmlFor="clockInStart" className="text-xs font-semibold text-gray-700">
+                    Start <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="clockInStart"
+                    type="time"
+                    value={workHours.clockInStart}
+                    onChange={(e) => setWorkHours({ ...workHours, clockInStart: e.target.value })}
+                    className="border border-green-300 focus:border-green-500 focus:ring-green-500 h-8"
+                  />
+                  <p className="text-[9px] text-gray-500">Earliest time</p>
+                </div>
+                
+                <div className="space-y-0.5">
+                  <Label htmlFor="clockInEnd" className="text-xs font-semibold text-gray-700">
+                    End <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="clockInEnd"
+                    type="time"
+                    value={workHours.clockInEnd}
+                    onChange={(e) => setWorkHours({ ...workHours, clockInEnd: e.target.value })}
+                    className="border border-green-300 focus:border-green-500 focus:ring-green-500 h-8"
+                  />
+                  <p className="text-[9px] text-gray-500">Latest time</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Work Hours */}
+            <div className="bg-green-50 rounded-md p-2.5 border border-green-200">
+              <h3 className="text-xs font-bold text-green-800 mb-1.5 flex items-center gap-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                Official Work Hours
+              </h3>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-0.5">
+                  <Label htmlFor="workStart" className="text-xs font-semibold text-gray-700">
+                    Start <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="workStart"
+                    type="time"
+                    value={workHours.workStart}
+                    onChange={(e) => setWorkHours({ ...workHours, workStart: e.target.value })}
+                    className="border border-green-300 focus:border-green-500 focus:ring-green-500 h-8"
+                  />
+                  <p className="text-[9px] text-gray-500">For late marking</p>
+                </div>
+                
+                <div className="space-y-0.5">
+                  <Label htmlFor="workEnd" className="text-xs font-semibold text-gray-700">
+                    End <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="workEnd"
+                    type="time"
+                    value={workHours.workEnd}
+                    onChange={(e) => setWorkHours({ ...workHours, workEnd: e.target.value })}
+                    className="border border-green-300 focus:border-green-500 focus:ring-green-500 h-8"
+                  />
+                  <p className="text-[9px] text-gray-500">Official end</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Clock-Out Times */}
+            <div className="bg-green-50 rounded-md p-2.5 border border-green-200">
+              <h3 className="text-xs font-bold text-green-800 mb-1.5 flex items-center gap-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                Clock-Out Window
+              </h3>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-0.5">
+                  <Label htmlFor="clockOutTime" className="text-xs font-semibold text-gray-700">
+                    Start <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="clockOutTime"
+                    type="time"
+                    value={workHours.clockOutTime}
+                    onChange={(e) => setWorkHours({ ...workHours, clockOutTime: e.target.value })}
+                    className="border border-green-300 focus:border-green-500 focus:ring-green-500 h-8"
+                  />
+                  <p className="text-[9px] text-gray-500">Earliest time</p>
+                </div>
+                
+                <div className="space-y-0.5">
+                  <Label htmlFor="extendedClockOutTime" className="text-xs font-semibold text-gray-700">
+                    End <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="extendedClockOutTime"
+                    type="time"
+                    value={workHours.extendedClockOutTime}
+                    onChange={(e) => setWorkHours({ ...workHours, extendedClockOutTime: e.target.value })}
+                    className="border border-green-300 focus:border-green-500 focus:ring-green-500 h-8"
+                  />
+                  <p className="text-[9px] text-gray-500">Latest time</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="pt-2 border-t border-green-100 flex justify-between items-center gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowWorkHoursModal(false)} 
+              className="border border-red-400 text-red-600 hover:bg-red-50 font-semibold px-3 h-8 text-xs"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Cancel
+            </Button>
+            <Button 
+              onClick={async () => {
+                // Validate all fields are filled
+                if (!workHours.clockInStart || !workHours.clockInEnd || !workHours.workStart || 
+                    !workHours.workEnd || !workHours.clockOutTime || !workHours.extendedClockOutTime) {
+                  setModalMessage('Please fill in all time fields before saving!');
+                  setShowErrorModal(true);
+                  return;
+                }
+                
+                try {
+                  // Save to API
+                  const response = await workHoursApi.updateWorkHours({
+                    clock_in_start: workHours.clockInStart,
+                    clock_in_end: workHours.clockInEnd,
+                    work_start: workHours.workStart,
+                    work_end: workHours.workEnd,
+                    clock_out_time: workHours.clockOutTime,
+                    extended_clock_out_time: workHours.extendedClockOutTime,
+                  });
+                  
+                  if (response.success) {
+                    console.log('Work hours saved:', response.data);
+                    setShowWorkHoursModal(false);
+                    setModalMessage('Work hours settings saved successfully!');
+                    setShowSuccessModal(true);
+                  } else {
+                    throw new Error(response.message || 'Failed to save');
+                  }
+                } catch (error: any) {
+                  console.error('Error saving work hours:', error);
+                  setModalMessage('Failed to save work hours settings. Please try again.\n\nError: ' + (error?.message || 'Unknown error'));
+                  setShowErrorModal(true);
+                }
+              }}
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 h-8 text-xs shadow-md"
+            >
+              <Save className="h-3 w-3 mr-1" />
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Modal */}
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent className="max-w-md bg-white">
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center justify-center w-full">
+              <div className="rounded-full bg-green-100 p-3">
+                <Check className="h-8 w-8 text-green-600" />
+              </div>
+            </div>
+            <DialogTitle className="text-center text-xl font-bold text-gray-900">
+              Success
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 px-2">
+            <p className="text-center text-gray-700 text-base">{modalMessage}</p>
+          </div>
+          <DialogFooter className="flex justify-center sm:justify-center">
+            <Button 
+              onClick={() => setShowSuccessModal(false)}
+              className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 font-semibold"
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Modal */}
+      <Dialog open={showErrorModal} onOpenChange={setShowErrorModal}>
+        <DialogContent className="max-w-md bg-white">
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center justify-center w-full">
+              <div className="rounded-full bg-red-100 p-3">
+                <AlertCircle className="h-8 w-8 text-red-600" />
+              </div>
+            </div>
+            <DialogTitle className="text-center text-xl font-bold text-gray-900">
+              Error
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 px-2">
+            <p className="text-center text-gray-700 text-base whitespace-pre-line">{modalMessage}</p>
+          </div>
+          <DialogFooter className="flex justify-center sm:justify-center">
+            <Button 
+              onClick={() => setShowErrorModal(false)}
+              className="bg-red-600 hover:bg-red-700 text-white px-8 py-2 font-semibold"
+            >
+              OK
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -786,4 +1328,3 @@ export default function EmployeeManagementPage() {
     </div>
   );
 }
-

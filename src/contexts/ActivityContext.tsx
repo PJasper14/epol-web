@@ -85,14 +85,17 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
   };
 
   const getRecentActivities = (limit: number = 20): Activity[] => {
-    return activities.slice(0, limit);
+    // Filter activities from the last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const recentActivities = activities.filter(activity => {
+      const activityDate = new Date(activity.created_at);
+      return activityDate >= sevenDaysAgo;
+    });
+    
+    return recentActivities.slice(0, limit);
   };
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      refreshActivities();
-    }
-  }, [isAuthenticated]);
 
   const value: ActivityContextType = {
     activities,
