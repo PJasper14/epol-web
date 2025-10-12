@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { reassignmentApiService, ReassignmentRequest as ApiReassignmentRequest } from '@/services/reassignmentApi';
 import { useAdmin } from './AdminContext';
 
@@ -55,7 +55,8 @@ export function ReassignmentRequestProvider({ children }: { children: ReactNode 
   const [requests, setRequests] = useState<ReassignmentRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAdmin();
+  const { isAuthenticated, loading: adminLoading } = useAdmin();
+  const hasLoadedRef = useRef(false);
 
   const fetchRequests = async () => {
     if (!isAuthenticated) {
@@ -124,12 +125,13 @@ export function ReassignmentRequestProvider({ children }: { children: ReactNode 
     return requests.filter(request => request.status === 'pending').length;
   };
 
-  // Fetch requests on component mount only if authenticated
+  // Fetch requests on component mount only if authenticated (load once)
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !adminLoading && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       fetchRequests();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, adminLoading]);
 
   const value: ReassignmentRequestContextType = {
     requests,

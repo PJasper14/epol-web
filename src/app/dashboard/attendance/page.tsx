@@ -946,7 +946,10 @@ export default function AttendanceRecordsPage() {
               EPOL Validation Records
             </DialogTitle>
             <DialogDescription className="text-gray-600">
-              View today's validation remarks and evidence photos submitted by team leaders for street sweepers attendance.
+              {selectedDate 
+                ? `View validation remarks and evidence photos for ${selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
+                : "Please select a date from the date picker to view validation records."
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6">
@@ -973,14 +976,32 @@ function ValidationDataComponent({ selectedDate }: { selectedDate: Date | null }
     const fetchValidations = async () => {
       try {
         setLoading(true);
-        const date = selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        
+        // If no date is selected, don't fetch anything
+        if (!selectedDate) {
+          setValidations([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Format date in local timezone to avoid timezone conversion issues
+        const formatLocalDate = (date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        
+        const date = formatLocalDate(selectedDate);
         const response = await apiService.getAttendanceValidations({ date });
         
         if (response.data) {
-          setValidations(response.data.data || []);
+          // Laravel pagination response structure
+          const validationData = Array.isArray(response.data) ? response.data : (response.data.data || []);
+          setValidations(validationData);
         }
       } catch (err) {
-        console.error('Error fetching validations:', err);
+        console.error('[ValidationDataComponent] Error fetching validations:', err);
         setError('Failed to load validation data');
       } finally {
         setLoading(false);
@@ -1012,7 +1033,12 @@ function ValidationDataComponent({ selectedDate }: { selectedDate: Date | null }
     return (
       <div className="text-center py-8">
         <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600">No validation records found for the selected date.</p>
+        <p className="text-gray-600">
+          {selectedDate 
+            ? "No validation records found for the selected date."
+            : "Please select a date to view validation records."
+          }
+        </p>
       </div>
     );
   }
@@ -1059,29 +1085,42 @@ function ValidationDataComponent({ selectedDate }: { selectedDate: Date | null }
             {validation.evidence && validation.evidence.length > 0 && (
               <div>
                 <h4 className="font-medium text-gray-900 mb-2">Evidence Photos:</h4>
-                <div className="flex gap-2 flex-wrap">
-                  {validation.evidence.map((evidence: string, evidenceIndex: number) => (
-                    <div key={evidenceIndex} className="bg-gray-200 rounded-lg p-2 text-center w-24">
-                      <div className="h-16 w-full bg-gray-300 rounded flex items-center justify-center">
-                        <span className="text-gray-500 text-xs">Photo</span>
+                <div className="flex gap-3 flex-wrap">
+                  {validation.evidence.map((evidencePath: string, evidenceIndex: number) => {
+                    // Construct full URL to Laravel backend
+                    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+                    const BACKEND_URL = API_BASE.replace('/api', ''); // Remove /api to get base URL
+                    
+                    const imageUrl = evidencePath.startsWith('http') 
+                      ? evidencePath 
+                      : `${BACKEND_URL}/storage/${evidencePath}`;
+                    
+                    return (
+                      <div 
+                        key={evidenceIndex} 
+                        className="relative group cursor-pointer"
+                        onClick={() => window.open(imageUrl, '_blank')}
+                      >
+                        <img 
+                          src={imageUrl}
+                          alt={`Evidence ${evidenceIndex + 1}`}
+                          className="w-32 h-32 object-cover rounded-lg border-2 border-gray-300 hover:border-blue-500 transition-colors"
+                          onError={(e) => {
+                            // Fallback if image fails to load
+                            const target = e.target as HTMLImageElement;
+                            target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+SW1hZ2UgTm90IEZvdW5kPC90ZXh0Pjwvc3ZnPg==';
+                          }}
+                        />
+                        <p className="text-xs text-gray-600 mt-1 text-center">Evidence {evidenceIndex + 1}</p>
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded-lg transition-opacity flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+                          <span className="text-white text-xs font-medium bg-black bg-opacity-50 px-2 py-1 rounded">Click to view</span>
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-600 mt-1">Evidence {evidenceIndex + 1}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
-            <div className="mt-3 flex items-center gap-2">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                validation.status === 'approved' 
-                  ? 'bg-green-100 text-green-800' 
-                  : validation.status === 'rejected'
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {validation.status?.charAt(0).toUpperCase() + validation.status?.slice(1) || 'Pending'}
-              </span>
-            </div>
           </div>
         );
       })}

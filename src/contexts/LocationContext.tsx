@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { WorkplaceLocation } from '@/types/location';
 import { apiService } from '@/lib/api';
 import { useAdmin } from './AdminContext';
@@ -40,7 +40,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const [workplaceLocations, setWorkplaceLocations] = useState<WorkplaceLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAdmin();
+  const { isAuthenticated, loading: adminLoading } = useAdmin();
+  const hasLoadedRef = useRef(false);
 
   const refreshLocations = async () => {
     if (!isAuthenticated) {
@@ -107,10 +108,11 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !adminLoading && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       refreshLocations();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, adminLoading]);
 
   return (
     <LocationContext.Provider value={{

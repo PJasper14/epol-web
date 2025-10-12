@@ -24,7 +24,10 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Trash2
+  Trash2,
+  FileText,
+  Info,
+  MessageSquare
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePasswordReset, PasswordResetRequest } from '@/contexts/PasswordResetContext';
@@ -455,114 +458,177 @@ export default function PasswordResetRequestsPage() {
         {selectedRequest && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <Card className="w-full max-w-2xl shadow-2xl bg-white">
-              <CardHeader className="bg-gradient-to-r from-slate-100 to-slate-200 border-b border-slate-300">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-3 text-xl text-gray-900">
-                    <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
-                      <Key className="h-4 w-4 text-white" />
+              <CardHeader className="pb-3 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center shadow-lg flex-shrink-0 ${
+                    selectedRequest.status === 'approved' 
+                      ? 'bg-gradient-to-br from-green-500 to-green-600'
+                      : selectedRequest.status === 'rejected'
+                      ? 'bg-gradient-to-br from-red-500 to-red-600'
+                      : 'bg-gradient-to-br from-orange-500 to-orange-600'
+                  }`}>
+                    {selectedRequest.status === 'approved' ? (
+                      <CheckCircle className="h-5 w-5 text-white" />
+                    ) : selectedRequest.status === 'rejected' ? (
+                      <XCircle className="h-5 w-5 text-white" />
+                    ) : (
+                      <Key className="h-5 w-5 text-white" />
+                    )}
                     </div>
-                    Password Reset Request Details
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-xl font-bold text-gray-900">
+                        Password Reset Request
                   </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedRequest(null)}
-                    className="h-8 w-8 p-0 hover:bg-slate-300 rounded-md"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 space-y-6 bg-white">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      User Name
-                    </Label>
-                      <p className="text-base text-slate-600">{selectedRequest.user_name}</p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Requested At
-                  </Label>
-                      <p className="text-base text-slate-600">{new Date(selectedRequest.requested_at).toLocaleString()}</p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Status
-                  </Label>
-                      <Badge className={`${getStatusColor(selectedRequest.status)} flex items-center gap-2 w-fit px-3 py-1 text-sm`}>
+                      <Badge className={`${getStatusColor(selectedRequest.status)} border flex items-center gap-1 text-xs`}>
                     {getStatusIcon(selectedRequest.status)}
                     {selectedRequest.status.charAt(0).toUpperCase() + selectedRequest.status.slice(1)}
                   </Badge>
                     </div>
+                    <CardDescription className="text-gray-600 text-xs mt-0.5">
+                      {selectedRequest.status === 'pending' 
+                        ? 'Review and make a decision on this request'
+                        : 'View details of this request'}
+                    </CardDescription>
                   </div>
-                  
-                  <div className="space-y-4">
-                    
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                        <Phone className="h-4 w-4" />
-                        Contact Number
-                      </Label>
-                      <p className="text-base text-slate-600">{selectedRequest.user_phone}</p>
+                </div>
+              </CardHeader>
+              <CardContent className="py-3 space-y-3 bg-white">
+                {/* User Information Card */}
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-blue-900 text-base">{selectedRequest.user_name}</p>
+                    <p className="text-blue-700 text-sm">
+                      {((selectedRequest.user as any)?.role || 'N/A').replace(/_/g, ' ').toUpperCase()}
+                    </p>
+                    <div className="flex items-center gap-2 text-blue-700 text-sm mt-2">
+                      <Phone className="h-3 w-3" />
+                      <span>{selectedRequest.user_phone}</span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-600">Reason</Label>
-                  <div className="bg-white border border-gray-300 rounded-md p-4 min-h-[80px]">
-                    <p className="text-gray-900 text-sm leading-relaxed">{selectedRequest.reason}</p>
+                {/* Request Details Card */}
+                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <div className="h-8 w-8 rounded-full bg-yellow-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                      <FileText className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-xs font-semibold text-yellow-900 mb-2">
+                        Request Details
+                      </h3>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex items-start gap-2">
+                          <Info className="h-3 w-3 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-yellow-700 text-xs">Request ID</p>
+                            <p className="font-medium text-yellow-900 text-sm">{selectedRequest.id}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Calendar className="h-3 w-3 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-yellow-700 text-xs">Requested At</p>
+                            <p className="font-semibold text-yellow-900 text-sm">{new Date(selectedRequest.requested_at).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <MessageSquare className="h-3 w-3 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-yellow-700 text-xs">Reason</p>
+                            <p className="font-medium text-yellow-900 text-sm mt-0.5">{selectedRequest.reason}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
-                {selectedRequest.admin_notes && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-600">Admin Notes</Label>
-                    <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
-                      <p className="text-gray-900 text-sm">{selectedRequest.admin_notes}</p>
+                {/* Admin Notes Section */}
+                <div className={`border rounded-lg p-3 ${
+                  selectedRequest.status === 'pending' 
+                    ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+                    : selectedRequest.status === 'approved'
+                    ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+                    : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ${
+                      selectedRequest.status === 'pending'
+                        ? 'bg-green-500'
+                        : selectedRequest.status === 'approved'
+                        ? 'bg-green-500'
+                        : 'bg-red-500'
+                    }`}>
+                      <MessageSquare className="h-4 w-4 text-white" />
                     </div>
-                  </div>
-                )}
-                
-                {selectedRequest.status === 'pending' && (
-                  <div className="space-y-4 pt-6 border-t border-gray-200">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-600">Admin Notes (Optional)</Label>
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <h3 className={`text-xs font-semibold ${
+                        selectedRequest.status === 'pending'
+                          ? 'text-green-900'
+                          : selectedRequest.status === 'approved'
+                          ? 'text-green-900'
+                          : 'text-red-900'
+                      }`}>
+                        {selectedRequest.status === 'pending' ? 'Admin Notes (Optional)' : 'Admin Notes'}
+                      </h3>
+                      {selectedRequest.status === 'pending' ? (
                       <Textarea
                         value={adminNotes}
                         onChange={(e) => setAdminNotes(e.target.value)}
                         placeholder="Add notes about your decision..."
-                        className="min-h-[80px] resize-none"
-                      />
+                          className="w-full border-green-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none text-sm"
+                          rows={2}
+                        />
+                      ) : (
+                        <p className={`text-sm ${
+                          selectedRequest.status === 'approved'
+                            ? 'text-green-900'
+                            : 'text-red-900'
+                        }`}>
+                          {selectedRequest.admin_notes || 'No admin notes provided'}
+                        </p>
+                      )}
                     </div>
+                  </div>
+                </div>
+              </CardContent>
                     
-                    <div className="flex items-center gap-4">
+              {/* Footer Buttons */}
+              <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-2">
+                {selectedRequest.status === 'pending' ? (
+                  <>
                       <Button
-                        onClick={() => handleApprove(selectedRequest.id)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md shadow-sm"
+                      onClick={() => setSelectedRequest(null)}
+                      className="bg-gray-900 hover:bg-gray-800 text-white border-gray-900 px-6"
                       >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Approve Request
+                      Cancel
                       </Button>
                       <Button
                         onClick={() => handleReject(selectedRequest.id)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-md shadow-sm"
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 shadow-lg"
                       >
                         <XCircle className="h-4 w-4 mr-2" />
                         Reject Request
                       </Button>
-                    </div>
-                  </div>
+                    <Button
+                      onClick={() => handleApprove(selectedRequest.id)}
+                      className="bg-green-600 hover:bg-green-700 text-white px-6 shadow-lg"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve Request
+                    </Button>
+                  </>
+                ) : (
+                  <Button 
+                    onClick={() => setSelectedRequest(null)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 shadow-lg"
+                  >
+                    Close
+                  </Button>
                 )}
-              </CardContent>
+              </div>
             </Card>
           </div>
         )}

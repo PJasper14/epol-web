@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { apiService } from "@/lib/api";
 import { useAdmin } from "@/contexts/AdminContext";
 
@@ -106,7 +106,8 @@ export function IncidentProvider({ children }: { children: ReactNode }) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAdmin();
+  const { isAuthenticated, loading: adminLoading } = useAdmin();
+  const hasLoadedRef = useRef(false);
 
   // Load incidents from API
   const loadIncidents = async () => {
@@ -131,8 +132,18 @@ export function IncidentProvider({ children }: { children: ReactNode }) {
           latitude: parseFloat(incident.latitude),
           longitude: parseFloat(incident.longitude)
         } : undefined,
-        images: incident.media?.filter((m: any) => m.type === 'photo')?.map((m: any) => m.url || `/storage/${m.file_path}`) || [],
-        videos: incident.media?.filter((m: any) => m.type === 'video')?.map((m: any) => m.url || `/storage/${m.file_path}`) || [],
+        images: incident.media?.filter((m: any) => m.type === 'photo')?.map((m: any) => {
+          if (m.url) return m.url;
+          const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+          const BACKEND_URL = API_BASE.replace('/api', '');
+          return `${BACKEND_URL}/storage/${m.file_path}`;
+        }) || [],
+        videos: incident.media?.filter((m: any) => m.type === 'video')?.map((m: any) => {
+          if (m.url) return m.url;
+          const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+          const BACKEND_URL = API_BASE.replace('/api', '');
+          return `${BACKEND_URL}/storage/${m.file_path}`;
+        }) || [],
         createdAt: incident.created_at,
         actions: [
           {
@@ -152,14 +163,15 @@ export function IncidentProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Load incidents when authenticated (same pattern as InventoryContext)
+  // Load incidents when authenticated (load once)
   useEffect(() => {
-    console.log('[IncidentContext] isAuthenticated changed:', isAuthenticated);
-    if (isAuthenticated) {
+    console.log('[IncidentContext] isAuthenticated changed:', isAuthenticated, 'adminLoading:', adminLoading);
+    if (isAuthenticated && !adminLoading && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       console.log('[IncidentContext] Loading incidents');
       loadIncidents();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, adminLoading]);
 
   const updateIncident = (id: string, updates: Partial<Incident>) => {
     setIncidents((prev) =>

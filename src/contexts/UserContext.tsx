@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { apiService } from '@/lib/api';
 import { useAdmin } from './AdminContext';
 
@@ -72,14 +72,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAdmin();
+  const { isAuthenticated, loading: adminLoading } = useAdmin();
+  const hasLoadedRef = useRef(false);
 
-  // Load users on component mount only if authenticated
+  // Load users on component mount or when authenticated (load once)
   useEffect(() => {
-    if (isAuthenticated) {
+    console.log('[UserContext] useEffect - isAuthenticated:', isAuthenticated, 'adminLoading:', adminLoading, 'hasLoaded:', hasLoadedRef.current, 'users.length:', users.length);
+    if (isAuthenticated && !adminLoading && !hasLoadedRef.current) {
+      console.log('[UserContext] ✅ Loading users for first time');
+      hasLoadedRef.current = true;
       refreshUsers();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, adminLoading]);
 
   const refreshUsers = async () => {
     setLoading(true);
@@ -94,12 +98,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
 
       // Call the API to get users
+      console.log('[UserContext] Fetching users from API...');
       const response = await apiService.getUsers();
       const transformedUsers = response.data?.map(transformApiUser) || [];
+      console.log('[UserContext] ✅ Loaded users:', transformedUsers.length, 'users');
       setUsers(transformedUsers);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load users');
-      console.error('Failed to load users:', err);
+      console.error('[UserContext] ❌ Failed to load users:', err);
     } finally {
       setLoading(false);
     }

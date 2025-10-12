@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { apiService } from '@/lib/api';
 import { useAdmin } from './AdminContext';
 
@@ -46,7 +46,8 @@ export function AssignmentProvider({ children }: { children: ReactNode }) {
   const [assignments, setAssignments] = useState<EmployeeAssignment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAdmin();
+  const { isAuthenticated, loading: adminLoading } = useAdmin();
+  const hasLoadedRef = useRef(false);
 
   const fetchAssignments = async () => {
     if (!isAuthenticated) {
@@ -122,10 +123,11 @@ export function AssignmentProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !adminLoading && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       fetchAssignments();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, adminLoading]);
 
   return (
     <AssignmentContext.Provider value={{

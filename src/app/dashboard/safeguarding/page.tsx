@@ -240,7 +240,7 @@ export default function SafeguardingRecordsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm text-gray-600 font-medium mb-1">Ongoing</p>
+                <p className="text-sm text-gray-600 font-medium mb-1">Ongoing Reports</p>
                 <p className="text-3xl font-bold text-gray-900 mb-2">
                   {incidents.filter(r => r.status === "Ongoing").length}
                 </p>
@@ -256,7 +256,7 @@ export default function SafeguardingRecordsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm text-gray-600 font-medium mb-1">Resolved</p>
+                <p className="text-sm text-gray-600 font-medium mb-1">Resolved Reports</p>
                 <p className="text-3xl font-bold text-gray-900 mb-2">
                   {incidents.filter(r => r.status === "Resolved").length}
                 </p>

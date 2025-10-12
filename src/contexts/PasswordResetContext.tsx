@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { apiService } from '@/lib/api';
 import { useAdmin } from './AdminContext';
 
@@ -22,6 +22,7 @@ export interface PasswordResetRequest {
     first_name: string;
     last_name: string;
     phone: string;
+    role?: string;
   };
 }
 
@@ -64,14 +65,16 @@ export function PasswordResetProvider({ children }: { children: ReactNode }) {
   const [requests, setRequests] = useState<PasswordResetRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAdmin();
+  const { isAuthenticated, loading: adminLoading } = useAdmin();
+  const hasLoadedRef = useRef(false);
 
-  // Load requests on mount only if authenticated
+  // Load requests on mount only if authenticated (load once)
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !adminLoading && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       refreshRequests();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, adminLoading]);
 
   const refreshRequests = async () => {
     if (!isAuthenticated) {

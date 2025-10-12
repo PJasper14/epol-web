@@ -653,8 +653,7 @@ export default function CreateUserAccountPage() {
                 <Link href="/dashboard/accounts">
                   <Button 
                     type="button" 
-                    variant="outline" 
-                    className="hover:bg-gray-50 border-gray-300 text-gray-700 hover:border-gray-400 transition-all duration-200"
+                    className="bg-red-600 hover:bg-red-700 text-white transition-all duration-200 shadow-md hover:shadow-lg"
                   >
                     <X className="h-4 w-4 mr-2" />
                     Cancel

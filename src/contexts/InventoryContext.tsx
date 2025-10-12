@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useState, useContext, ReactNode, useEffect } from "react";
+import React, { createContext, useState, useContext, ReactNode, useEffect, useRef } from "react";
 import { useAdmin } from "./AdminContext";
 import { apiService } from "@/lib/api";
 
@@ -63,7 +63,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAdmin();
+  const { isAuthenticated, loading: adminLoading } = useAdmin();
+  const hasLoadedRef = useRef(false);
 
   // Load inventory items from API
   const loadInventoryItems = async () => {
@@ -74,22 +75,28 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
+      console.log('[InventoryContext] Fetching inventory items from API...');
       const response = await apiService.getInventoryItems();
-      setItems(response.data || []);
+      const items = response.data || [];
+      console.log('[InventoryContext] ✅ Loaded inventory items:', items.length, 'items');
+      setItems(items);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory items');
-      console.error('Error loading inventory items:', err);
+      console.error('[InventoryContext] ❌ Error loading inventory items:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Load inventory items on component mount only if authenticated
+  // Load inventory items on component mount only if authenticated (load once)
   useEffect(() => {
-    if (isAuthenticated) {
+    console.log('[InventoryContext] useEffect - isAuthenticated:', isAuthenticated, 'adminLoading:', adminLoading, 'hasLoaded:', hasLoadedRef.current);
+    if (isAuthenticated && !adminLoading && !hasLoadedRef.current) {
+      console.log('[InventoryContext] ✅ Loading inventory items for first time');
+      hasLoadedRef.current = true;
       loadInventoryItems();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, adminLoading]);
 
   // Add a new inventory item
   const addInventoryItem = async (item: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => {

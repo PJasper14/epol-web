@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { apiService } from '@/lib/api';
+import { useAdmin } from './AdminContext';
 
 export interface WorkplaceLocation {
   id: string;
@@ -49,8 +50,14 @@ export function WorkplaceLocationProvider({ children }: { children: ReactNode })
   const [locations, setLocations] = useState<WorkplaceLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, loading: adminLoading } = useAdmin();
+  const hasLoadedRef = useRef(false);
 
   const refreshLocations = async () => {
+    if (!isAuthenticated) {
+      return; // Don't make API calls if not authenticated
+    }
+    
     try {
       setLoading(true);
       setError(null);
@@ -86,8 +93,11 @@ export function WorkplaceLocationProvider({ children }: { children: ReactNode })
   };
 
   useEffect(() => {
-    refreshLocations();
-  }, []);
+    if (isAuthenticated && !adminLoading && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      refreshLocations();
+    }
+  }, [isAuthenticated, adminLoading]);
 
   const value: WorkplaceLocationContextType = {
     locations,
