@@ -45,48 +45,46 @@ export default function CreateUserAccountPage() {
     notes: ''
   });
 
-  // Auto-generate password function
-  const generatePassword = () => {
-    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+  // Auto-generate password function based on user details
+  const generatePassword = (firstName: string, lastName: string, birthday: string) => {
+    if (!firstName || !lastName || !birthday) return '';
     
-    let password = '';
+    // Get last character of first name and last name
+    const firstLastChar = firstName.slice(-1).toLowerCase();
+    const lastLastChar = lastName.slice(-1).toLowerCase();
     
-    // Ensure at least one character from each category
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += specialChars[Math.floor(Math.random() * specialChars.length)];
+    // Format birthday as DDMMYYYY
+    const birthDate = new Date(birthday);
+    const day = String(birthDate.getDate()).padStart(2, '0');
+    const month = String(birthDate.getMonth() + 1).padStart(2, '0');
+    const year = birthDate.getFullYear();
+    const birthdayFormatted = day + month + year;
     
-    // Fill the rest randomly
-    const allChars = uppercase + lowercase + numbers + specialChars;
-    for (let i = 4; i < 12; i++) {
-      password += allChars[Math.floor(Math.random() * allChars.length)];
-    }
+    // Combine: birthday + last chars of first and last name
+    return birthdayFormatted + firstLastChar + lastLastChar;
+  };
+
+  // Auto-generate username function based on user details
+  const generateUsername = (firstName: string, birthday: string) => {
+    if (!firstName || !birthday) return '';
     
-    // Shuffle the password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+    // Remove spaces from first name
+    const cleanFirstName = firstName.replace(/\s+/g, '');
+    
+    // Get last 2 digits of birthday year
+    const birthDate = new Date(birthday);
+    const year = String(birthDate.getFullYear()).slice(-2);
+    
+    // Combine: first name (no spaces) + last 2 digits of year
+    return cleanFirstName + year;
   };
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showPassword, setShowPassword] = useState(false);
-  const [passwordStrength, setPasswordStrength] = useState(0);
   const [isPasswordGenerated, setIsPasswordGenerated] = useState(false);
   const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
-
-  const calculatePasswordStrength = (password: string) => {
-    let strength = 0;
-    if (password.length >= 8) strength += 1;
-    if (/[A-Z]/.test(password)) strength += 1;
-    if (/[a-z]/.test(password)) strength += 1;
-    if (/\d/.test(password)) strength += 1;
-    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) strength += 1;
-    return strength;
-  };
 
   const calculateAgeFromBirthday = (birthday: string) => {
     if (!birthday) return null;
@@ -100,66 +98,79 @@ export default function CreateUserAccountPage() {
     return age;
   };
 
-  const handleGeneratePassword = () => {
-    let newPassword;
-    let strength;
+  // Auto-generate credentials when all required fields are filled
+  const autoGenerateCredentials = (updatedFormData: FormData) => {
+    const { firstName, lastName, phone, gender, birthday, homeAddress, role } = updatedFormData;
     
-    // Keep generating until we get a very strong password (5/5)
-    do {
-      newPassword = generatePassword();
-      strength = calculatePasswordStrength(newPassword);
-    } while (strength < 5);
+    // Check if ALL required fields from Personal Information and Account Settings are filled
+    const personalInfoComplete = firstName && lastName && phone && gender && birthday && homeAddress;
+    const accountSettingsComplete = role;
     
-    setFormData(prev => ({
-      ...prev,
-      password: newPassword
-    }));
-    setPasswordStrength(strength);
-    setIsPasswordGenerated(true);
+    if (personalInfoComplete && accountSettingsComplete) {
+      // Generate password
+      const newPassword = generatePassword(firstName, lastName, birthday);
+      
+      // Generate username
+      const newUsername = generateUsername(firstName, birthday);
+      
+      // Update form data with generated credentials
+      setFormData(prev => ({
+        ...prev,
+        password: newPassword,
+        username: newUsername
+      }));
+      
+      setIsPasswordGenerated(true);
+    }
   };
 
 
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
+    let updatedFormData: FormData;
+    
     // Special handling for phone number to allow only digits and limit to 11 digits
     if (field === 'phone' && typeof value === 'string') {
       // Remove any non-digit characters and limit to 11 digits
       const numericValue = value.replace(/\D/g, '').slice(0, 11);
-      setFormData(prev => ({
-        ...prev,
+      updatedFormData = {
+        ...formData,
         [field]: numericValue
-      }));
-          } else if (field === 'homeAddress' && typeof value === 'string') {
+      };
+    } else if (field === 'homeAddress' && typeof value === 'string') {
       // Allow only letters, numbers, and spaces for home address
       const cleanValue = value.replace(/[^a-zA-Z0-9\s]/g, '');
-      setFormData(prev => ({
-        ...prev,
+      updatedFormData = {
+        ...formData,
         [field]: cleanValue
-      }));
+      };
     } else if (field === 'username' && typeof value === 'string') {
       // Allow only alphanumeric and underscores for username
       const cleanValue = value.replace(/[^a-zA-Z0-9_.!@#$%^&*]/g, '');
-      setFormData(prev => ({
-        ...prev,
+      updatedFormData = {
+        ...formData,
         [field]: cleanValue
-      }));
-          } else {
-            setFormData(prev => ({
-              ...prev,
-              [field]: value
-            }));
-          }
-          
-          // Calculate age when birthday changes
-          if (field === 'birthday' && typeof value === 'string') {
-            const age = calculateAgeFromBirthday(value);
-            setCalculatedAge(age);
-          }
-    
-    // Calculate password strength
-    if (field === 'password' && typeof value === 'string') {
-      setPasswordStrength(calculatePasswordStrength(value));
+      };
+    } else {
+      updatedFormData = {
+        ...formData,
+        [field]: value
+      };
     }
     
+    // Update form data
+    setFormData(updatedFormData);
+    
+    // Calculate age when birthday changes
+    if (field === 'birthday' && typeof value === 'string') {
+      const age = calculateAgeFromBirthday(value);
+      setCalculatedAge(age);
+    }
+    
+    
+    // Auto-generate credentials when relevant fields change
+    if (['firstName', 'lastName', 'phone', 'gender', 'birthday', 'homeAddress', 'role'].includes(field)) {
+      autoGenerateCredentials(updatedFormData);
+    }
     
     // Clear errors when user starts typing
     if (errors[field]) {
@@ -201,26 +212,20 @@ export default function CreateUserAccountPage() {
         }
       }
 
-    // Strong password validation
+    // Password validation - simplified for auto-generated format
     if (formData.password) {
       const password = formData.password;
-      const hasUpperCase = /[A-Z]/.test(password);
-      const hasLowerCase = /[a-z]/.test(password);
-      const hasNumbers = /\d/.test(password);
-      const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
       const isLongEnough = password.length >= 8;
+      
+      // Check for invalid characters (only alphanumeric allowed for auto-generated format)
+      const hasInvalidChar = /[^a-zA-Z0-9]/.test(password);
       
       if (!isLongEnough) {
         newErrors.password = 'Password must be at least 8 characters long';
-      } else if (!hasUpperCase) {
-        newErrors.password = 'Password must contain at least one uppercase letter';
-      } else if (!hasLowerCase) {
-        newErrors.password = 'Password must contain at least one lowercase letter';
-      } else if (!hasNumbers) {
-        newErrors.password = 'Password must contain at least one number';
-      } else if (!hasSpecialChar) {
-        newErrors.password = 'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)';
+      } else if (hasInvalidChar) {
+        newErrors.password = 'Auto-generated password contains invalid characters';
       }
+      // No other validation needed - auto-generated passwords are accepted as-is
     }
 
     // Confirm password validation
@@ -549,8 +554,9 @@ export default function CreateUserAccountPage() {
                       type="text"
                       value={formData.username}
                       onChange={(e) => handleInputChange('username', e.target.value)}
-                      className={`h-12 focus:ring-2 transition-all duration-200 ${errors.username ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'focus:ring-red-500'}`}
-                      placeholder="Enter username"
+                      className={`h-12 focus:ring-2 transition-all duration-200 ${errors.username ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'focus:ring-red-500'} ${isPasswordGenerated ? 'bg-green-50 border-green-300' : ''}`}
+                      placeholder="Username will be auto-generated when all required fields are filled"
+                      readOnly={isPasswordGenerated}
                     />
                     {formData.username && !errors.username && (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -566,7 +572,10 @@ export default function CreateUserAccountPage() {
                     </div>
                   )}
                   <p className="text-xs text-gray-500">
-                    5-12 characters long, can contain letters and numbers
+                    {isPasswordGenerated 
+                      ? "Username auto-generated based on first name and birthday"
+                      : "Username will be auto-generated when all Personal Information and Account Settings fields are filled"
+                    }
                   </p>
                 </div>
 
@@ -582,11 +591,11 @@ export default function CreateUserAccountPage() {
                       type={showPassword ? "text" : "password"}
                       value={formData.password}
                       onChange={(e) => handleInputChange('password', e.target.value)}
-                      className={`h-12 pr-20 ${errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'focus:ring-red-500'} ${isPasswordGenerated ? 'bg-green-50 border-green-300' : ''}`}
-                      placeholder="Auto-generated password will appear here"
+                      className={`h-12 pr-12 ${errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'focus:ring-red-500'} ${isPasswordGenerated ? 'bg-green-50 border-green-300' : ''}`}
+                      placeholder="Password will be auto-generated when all required fields are filled"
                       readOnly={isPasswordGenerated}
                     />
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
@@ -594,44 +603,9 @@ export default function CreateUserAccountPage() {
                       >
                         {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                       </button>
-                      <Button
-                        type="button"
-                        onClick={handleGeneratePassword}
-                        className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 h-8"
-                      >
-                        Generate
-                      </Button>
                     </div>
                   </div>
                   
-                  {/* Password Strength Indicator */}
-                  {formData.password && (
-                    <div className="space-y-2">
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((level) => (
-                          <div
-                            key={level}
-                            className={`h-2 flex-1 rounded-full transition-all duration-300 ${
-                              level <= passwordStrength
-                                ? passwordStrength <= 2
-                                  ? 'bg-red-500'
-                                  : passwordStrength <= 3
-                                  ? 'bg-yellow-500'
-                                  : 'bg-green-500'
-                                : 'bg-gray-200'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <p className="text-xs text-gray-600">
-                        Strength: {
-                          passwordStrength <= 2 ? 'Weak' :
-                          passwordStrength <= 3 ? 'Medium' :
-                          passwordStrength <= 4 ? 'Strong' : 'Very Strong'
-                        }
-                      </p>
-                    </div>
-                  )}
                   
                   {errors.password && (
                     <div className="flex items-center gap-2 text-red-600 text-sm animate-in slide-in-from-top-1 duration-200">
@@ -641,8 +615,8 @@ export default function CreateUserAccountPage() {
                   )}
                   <p className="text-xs text-gray-500">
                     {isPasswordGenerated 
-                      ? "Password auto-generated with secure characters. Employee will need to change this on first login."
-                      : "Click 'Generate' to create a secure password automatically"
+                      ? "Password auto-generated based on employee details. Employee will need to change this on first login."
+                      : "Password will be auto-generated when all Personal Information and Account Settings fields are filled"
                     }
                   </p>
                 </div>

@@ -10,6 +10,10 @@ interface AttendanceRecord {
   clockOut: string | null;
   status: string;
   hoursRendered?: string;
+  work_start_time?: string | null;
+  work_end_time?: string | null;
+  required_work_hours?: number | null;
+  work_hours_metadata?: any | null;
 }
 
 // Helper function to format date
@@ -39,9 +43,30 @@ function formatTime(timeStr: string | null) {
 function getHoursRendered(record: AttendanceRecord) {
   if (!record.clockIn || !record.clockOut) return "-";
   
-  // Parse ISO timestamps
-  const clockInTime = new Date(record.clockIn);
-  const clockOutTime = new Date(record.clockOut);
+  // Parse time strings - handle both ISO format and time-only format
+  const parseTime = (timeStr: string) => {
+    if (timeStr.includes('T')) {
+      // ISO format like "2025-10-05T23:17:59.000000Z"
+      return new Date(timeStr);
+    } else if (timeStr.includes(' ')) {
+      // 12-hour format like "03:20 PM"
+      const [time, period] = timeStr.split(' ');
+      const [hours, minutes] = time.split(':').map(Number);
+      const hour24 = period === 'PM' ? (hours === 12 ? 12 : hours + 12) : (hours === 12 ? 0 : hours);
+      const date = new Date();
+      date.setHours(hour24, minutes, 0, 0);
+      return date;
+    } else {
+      // Time format like "23:17:59"
+      const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hours, minutes, seconds || 0, 0);
+      return date;
+    }
+  };
+
+  const clockInTime = parseTime(record.clockIn);
+  const clockOutTime = parseTime(record.clockOut);
   
   // Calculate difference in milliseconds, then convert to minutes
   const diffMs = clockOutTime.getTime() - clockInTime.getTime();
@@ -52,54 +77,93 @@ function getHoursRendered(record: AttendanceRecord) {
   
   return `${hours}h ${minutes}m`;
 }
-function isAllowableClockIn(clockIn: string | null) {
-  if (!clockIn) return false;
-  const date = new Date(clockIn);
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  if (hours === 14) {
-    return minutes >= 20 && minutes <= 30;
-  }
-  return false;
-}
-function isLate(clockIn: string | null) {
-  if (!clockIn) return false;
-  const date = new Date(clockIn);
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  return hours > 14 || (hours === 14 && minutes > 30);
-}
-function isUndertime(hoursRendered: string) {
+// Helper function to check if undertime (31 minutes or more short)
+function isUndertime(hoursRendered: string, requiredHours: number = 6) {
   if (hoursRendered === "-") return false;
   const [hoursStr, minutesStr] = hoursRendered.split('h ');
   const hours = parseInt(hoursStr);
   const minutes = parseInt(minutesStr);
+  
+  // Convert to total minutes for comparison
   const totalMinutes = (hours * 60) + minutes;
-  return totalMinutes < 210;
+  const requiredMinutes = requiredHours * 60;
+  
+  // Undertime: 31 minutes or more short of required hours
+  const shortfall = requiredMinutes - totalMinutes;
+  return shortfall >= 31;
 }
-function getAttendanceStatus(record: AttendanceRecord) {
-  if (!record.clockIn && !record.clockOut) return "Absent";
-  const hoursRendered = getHoursRendered(record);
+
+// Helper function to check if late (15-30 minutes short of required hours)
+function isLateByHours(hoursRendered: string, requiredHours: number = 6) {
+  if (hoursRendered === "-") return false;
+  const [hoursStr, minutesStr] = hoursRendered.split('h ');
+  const hours = parseInt(hoursStr);
+  const minutes = parseInt(minutesStr);
+  
+  // Convert to total minutes for comparison
+  const totalMinutes = (hours * 60) + minutes;
+  const requiredMinutes = requiredHours * 60;
+  
+  // Late: 15 to 30 minutes short of required hours
+  const shortfall = requiredMinutes - totalMinutes;
+  return shortfall >= 15 && shortfall <= 30;
+}
+
+function getAttendanceStatus(record: AttendanceRecord, requiredHours: number = 6, workEndTime?: string) {
+  // 1. ABSENT: No clock in and clock out at all
+  if (!record.clockIn && !record.clockOut) {
+    return "Absent";
+  }
+  
+  // 2. Clocked in but not yet clocked out - check if work hours are finished
   if (record.clockIn && !record.clockOut) {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTime = currentHour + (currentMinute / 60);
-    if (currentTime < 18.5) {
-      return "On Duty";
-    } else {
-      return "Late";
+    // Check if work hours have ended
+    if (workEndTime) {
+      const recordDate = new Date(record.date);
+      const today = new Date();
+      
+      // Only check if record is for today
+      const isToday = recordDate.getFullYear() === today.getFullYear() &&
+                      recordDate.getMonth() === today.getMonth() &&
+                      recordDate.getDate() === today.getDate();
+      
+      if (isToday) {
+        // Parse work end time (e.g., "16:30")
+        const [endHours, endMinutes] = workEndTime.split(':').map(Number);
+        const workEnd = new Date();
+        workEnd.setHours(endHours, endMinutes, 0, 0);
+        
+        const now = new Date();
+        
+        // If current time is past work end time, mark as Absent (forgot to clock out)
+        if (now > workEnd) {
+          return "Absent";
+        }
+      }
     }
-  }
-  if (isUndertime(hoursRendered)) {
-    return "Undertime";
-  }
-  if (isLate(record.clockIn)) {
-    return "Late";
-  }
-  if (isAllowableClockIn(record.clockIn)) {
+    
+    // Work hours not finished yet or not today's record - still working
     return "Present";
   }
+  
+  // Calculate hours rendered
+  const hoursRendered = getHoursRendered(record);
+  
+  if (hoursRendered === "-") {
+    return "Absent";
+  }
+  
+  // 3. UNDERTIME: 31 minutes or more short of required hours
+  if (isUndertime(hoursRendered, requiredHours)) {
+    return "Undertime";
+  }
+  
+  // 4. LATE: 15-30 minutes short of required hours
+  if (isLateByHours(hoursRendered, requiredHours)) {
+    return "Late";
+  }
+  
+  // 5. PRESENT: Rendered full hours or within 15 minutes of required hours
   return "Present";
 }
 
@@ -107,10 +171,14 @@ export async function exportEmployeeDTR({
   employeeName,
   employeePosition,
   records,
+  requiredWorkHours = 6,
+  workEndTime = "16:30",
 }: {
   employeeName: string;
   employeePosition: string;
   records: AttendanceRecord[];
+  requiredWorkHours?: number;
+  workEndTime?: string;
 }) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -171,7 +239,10 @@ export async function exportEmployeeDTR({
     const statusOrder = ["Present", "Late", "Absent", "Undertime", "On Duty"];
     const statusCounts: { [key: string]: number } = {};
     records.forEach((rec) => {
-      const status = getAttendanceStatus(rec);
+      // Use stored work hours settings if available, otherwise use current settings
+      const recordWorkHours = rec.required_work_hours || requiredWorkHours;
+      const recordWorkEndTime = rec.work_end_time || workEndTime;
+      const status = getAttendanceStatus(rec, recordWorkHours, recordWorkEndTime);
       statusCounts[status] = (statusCounts[status] || 0) + 1;
     });
 
@@ -197,13 +268,19 @@ export async function exportEmployeeDTR({
     // Continue with the rest of the PDF (table)
     let tableStartY = summaryY + 10;
     // Prepare table data
-    const tableData = records.map((rec) => [
-      formatDate(rec.date),
-      formatTime(rec.clockIn),
-      formatTime(rec.clockOut),
-      getHoursRendered(rec),
-      getAttendanceStatus(rec),
-    ]);
+    const tableData = records.map((rec) => {
+      // Use stored work hours settings if available, otherwise use current settings
+      const recordWorkHours = rec.required_work_hours || requiredWorkHours;
+      const recordWorkEndTime = rec.work_end_time || workEndTime;
+      
+      return [
+        formatDate(rec.date),
+        formatTime(rec.clockIn),
+        formatTime(rec.clockOut),
+        getHoursRendered(rec),
+        getAttendanceStatus(rec, recordWorkHours, recordWorkEndTime),
+      ];
+    });
     autoTable(doc, {
       startY: tableStartY,
       head: [['Date', 'Clock In', 'Clock Out', 'Hours Rendered', 'Status']],

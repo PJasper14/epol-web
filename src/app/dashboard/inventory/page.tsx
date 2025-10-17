@@ -522,6 +522,13 @@ export default function InventoryPage() {
                   <Box className="h-4 w-4" />
                   <span>Inventory Requests</span>
                 </Link>
+                <Link 
+                  href="/dashboard/inventory/distributions" 
+                  className="flex items-center gap-2 h-11 px-4 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-md hover:shadow-lg"
+                >
+                  <Box className="h-4 w-4" />
+                  <span>View Distributions</span>
+                </Link>
               </div>
             </div>
 

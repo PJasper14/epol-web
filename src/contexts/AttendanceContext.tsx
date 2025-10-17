@@ -26,6 +26,10 @@ export interface AttendanceRecord {
   status: string;
   total_hours: number | null;
   notes: string | null;
+  work_start_time: string | null;
+  work_end_time: string | null;
+  required_work_hours: number | null;
+  work_hours_metadata: any | null;
   created_at: string;
   updated_at: string;
 }
@@ -72,6 +76,7 @@ export const AttendanceProvider: React.FC<AttendanceProviderProps> = ({ children
       
       const response = await apiService.getAttendanceRecords(params);
       console.log('[AttendanceContext] API response:', response);
+      console.log('[AttendanceContext] Request URL params:', params);
       
       if (response.data) {
         const records = response.data.data || response.data;
@@ -83,6 +88,24 @@ export const AttendanceProvider: React.FC<AttendanceProviderProps> = ({ children
           console.log('[AttendanceContext] Last record date:', records[records.length - 1].date);
         }
         setAttendanceRecords(records);
+        
+        // If no records found and we're searching for a specific date, try searching without date filter
+        if (records.length === 0 && (params?.date || params?.date_from)) {
+          console.log('[AttendanceContext] No records found for specific date, trying to load all records...');
+          try {
+            const allRecordsResponse = await apiService.getAttendanceRecords({});
+            if (allRecordsResponse.data) {
+              const allRecords = allRecordsResponse.data.data || allRecordsResponse.data;
+              console.log('[AttendanceContext] All records loaded:', allRecords.length);
+              if (allRecords.length > 0) {
+                console.log('[AttendanceContext] Available dates in all records:', 
+                  [...new Set(allRecords.map((r: AttendanceRecord) => r.date.split('T')[0]))]);
+              }
+            }
+          } catch (fallbackError) {
+            console.log('[AttendanceContext] Fallback search failed:', fallbackError);
+          }
+        }
       } else {
         console.log('[AttendanceContext] No data in response');
         setError('Failed to load attendance records');

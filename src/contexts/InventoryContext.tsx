@@ -36,6 +36,10 @@ export interface Transaction {
   date?: string;
   action?: string;
   notes?: string;
+  // Enhanced fields for distribution tracking
+  distributed_to?: string;
+  location?: string;
+  request_number?: string;
 }
 
 interface InventoryContextType {

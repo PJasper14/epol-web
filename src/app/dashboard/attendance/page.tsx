@@ -177,6 +177,9 @@ function formatTime(time: string | null) {
 
 // Helper function to determine attendance status
 function getAttendanceStatus(record: any, requiredHours: number = 4, workEndTime?: string) {
+  // Use stored work hours settings if available, otherwise use current settings
+  const recordWorkHours = record.required_work_hours || requiredHours;
+  const recordWorkEndTime = record.work_end_time || workEndTime;
   // 1. ABSENT: No clock in and clock out at all
   if (!record.time_in && !record.time_out) {
     return "Absent";
@@ -185,7 +188,7 @@ function getAttendanceStatus(record: any, requiredHours: number = 4, workEndTime
   // 2. Clocked in but not yet clocked out - check if work hours are finished
   if (record.time_in && !record.time_out) {
     // Check if work hours have ended
-    if (workEndTime) {
+    if (recordWorkEndTime) {
       const recordDate = new Date(record.date);
       const today = new Date();
       
@@ -196,7 +199,7 @@ function getAttendanceStatus(record: any, requiredHours: number = 4, workEndTime
       
       if (isToday) {
         // Parse work end time (e.g., "16:30")
-        const [endHours, endMinutes] = workEndTime.split(':').map(Number);
+        const [endHours, endMinutes] = recordWorkEndTime.split(':').map(Number);
         const workEnd = new Date();
         workEnd.setHours(endHours, endMinutes, 0, 0);
         
@@ -221,12 +224,12 @@ function getAttendanceStatus(record: any, requiredHours: number = 4, workEndTime
   }
   
   // 3. UNDERTIME: More than 1 hour short of required hours
-  if (isUndertime(hoursRendered, requiredHours)) {
+  if (isUndertime(hoursRendered, recordWorkHours)) {
     return "Undertime";
   }
   
   // 4. LATE: 15-60 minutes short of required hours
-  if (isLateByHours(hoursRendered, requiredHours)) {
+  if (isLateByHours(hoursRendered, recordWorkHours)) {
     return "Late";
   }
   
@@ -285,6 +288,24 @@ export default function AttendanceRecordsPage() {
 
   // Use real attendance data from API
   const { attendanceRecords: attendanceRecordsState, loading: attendanceLoading, loadAttendanceRecords } = useAttendance();
+  
+  // State to store all records for modal display
+  const [allAttendanceRecords, setAllAttendanceRecords] = useState<any[]>([]);
+  
+  // Function to load all attendance records for modal
+  const loadAllRecordsForModal = async () => {
+    try {
+      console.log('[AttendancePage] Loading all records for modal...');
+      const response = await apiService.getAttendanceRecords({});
+      if (response.data) {
+        const allRecords = response.data.data || response.data;
+        console.log('[AttendancePage] Loaded all records for modal:', allRecords.length);
+        setAllAttendanceRecords(allRecords);
+      }
+    } catch (error) {
+      console.error('[AttendancePage] Failed to load all records for modal:', error);
+    }
+  };
 
   // Load work hours settings to calculate required work hours
   useEffect(() => {
@@ -329,7 +350,17 @@ export default function AttendanceRecordsPage() {
       
       console.log('[AttendancePage] Selected date object:', selectedDate);
       console.log('[AttendancePage] Loading records for date:', dateString);
-      loadAttendanceRecords({ date_from: dateString, date_to: dateString });
+      
+      // Try both date range and single date approaches to handle timezone issues
+      loadAttendanceRecords({ 
+        date: dateString,
+        date_from: dateString, 
+        date_to: dateString 
+      });
+    } else {
+      // If no date is selected, load all records
+      console.log('[AttendancePage] No date selected, loading all records');
+      loadAttendanceRecords();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]); // Only depend on selectedDate, not loadAttendanceRecords to prevent infinite loops
@@ -358,6 +389,9 @@ export default function AttendanceRecordsPage() {
     console.log('[AttendancePage] Filtering records...');
     console.log('[AttendancePage] Total records in state:', attendanceRecordsState.length);
     console.log('[AttendancePage] Selected date:', selectedDate);
+    if (attendanceRecordsState.length > 0) {
+      console.log('[AttendancePage] First record:', attendanceRecordsState[0]);
+    }
     
     const filtered = attendanceRecordsState.filter(record => {
       const employeeName = `${record.user?.first_name || ''} ${record.user?.last_name || ''}`.trim();
@@ -379,19 +413,46 @@ export default function AttendanceRecordsPage() {
       const recordStatus = getAttendanceStatus(record, requiredWorkHours, workEndTime);
       const matchesStatus = !selectedStatus || recordStatus === selectedStatus;
       
-      // Check if record date matches selected date (compare date strings to avoid timezone issues)
-      const recordDateString = record.date.split('T')[0]; // Extract "2025-10-09" from "2025-10-09T00:00:00.000Z"
+      // Check if record date matches selected date (convert to Manila timezone first)
+      const recordDate = new Date(record.date);
+      const recordDateInManila = new Date(recordDate.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+      const recordDateString = `${recordDateInManila.getFullYear()}-${String(recordDateInManila.getMonth() + 1).padStart(2, '0')}-${String(recordDateInManila.getDate()).padStart(2, '0')}`;
       
       // Format selected date in LOCAL timezone (not UTC) to avoid timezone shifts
       const selectedDateString = selectedDate 
         ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
         : null;
       
+      // Debug logging for date comparison
+      if (selectedDate && record === attendanceRecordsState[0]) {
+        console.log('[AttendancePage] Date comparison debug:', {
+          recordDate: record.date,
+          recordDateInManila: recordDateInManila.toISOString(),
+          recordDateString,
+          selectedDate: selectedDate.toISOString(),
+          selectedDateString,
+          match: recordDateString === selectedDateString
+        });
+      }
+      
       // If no date is selected, don't show any records
       const matchesDate = selectedDateString ? recordDateString === selectedDateString : false;
       
       if (selectedDate && record === attendanceRecordsState[0]) {
         console.log('[AttendancePage] Date comparison - Record:', recordDateString, '| Selected:', selectedDateString, '| Matches:', matchesDate);
+      }
+      
+      const recordMatches = matchesSearch && matchesPosition && matchesStatus && matchesDate;
+      
+      if (selectedDate && record === attendanceRecordsState[0]) {
+        console.log('[AttendancePage] Filter results:', {
+          employeeName: `${record.user?.first_name || ''} ${record.user?.last_name || ''}`.trim(),
+          matchesSearch,
+          matchesPosition,
+          matchesStatus,
+          matchesDate,
+          recordMatches
+        });
       }
       
       return matchesSearch && matchesPosition && matchesStatus && matchesDate;
@@ -412,13 +473,14 @@ export default function AttendanceRecordsPage() {
     setCurrentPage(1);
   }, [selectedPosition, selectedStatus, selectedDate, searchQuery]);
 
-  // Filter records for selected employee
+  // Filter records for selected employee - get ALL records for this employee, not just filtered ones
   const selectedEmployeeRecords = selectedEmployee
-    ? attendanceRecordsState.filter((rec) => {
+    ? (allAttendanceRecords.length > 0 ? allAttendanceRecords : attendanceRecordsState).filter((rec) => {
         const employeeName = `${rec.user?.first_name || ''} ${rec.user?.last_name || ''}`.trim();
         return employeeName === selectedEmployee.name;
       })
     : [];
+
 
   // Transform API records to the format expected by PDF export
   const transformRecordsForExport = (records: any[]) => {
@@ -432,7 +494,11 @@ export default function AttendanceRecordsPage() {
       date: record.date,
       clockIn: record.time_in,
       clockOut: record.time_out,
-      status: record.status || 'Present'
+      status: record.status || 'Present',
+      work_start_time: record.work_start_time,
+      work_end_time: record.work_end_time,
+      required_work_hours: record.required_work_hours,
+      work_hours_metadata: record.work_hours_metadata,
     }));
   };
 
@@ -814,8 +880,9 @@ export default function AttendanceRecordsPage() {
                             variant="default"
                             size="sm"
                             className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                            onClick={() => {
+                            onClick={async () => {
                               setSelectedEmployee({ name: employeeName, position: recordPosition });
+                              await loadAllRecordsForModal();
                               setModalOpen(true);
                             }}
                           >

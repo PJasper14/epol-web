@@ -25,6 +25,10 @@ interface AttendanceRecord {
   clockIn: string | null;
   clockOut: string | null;
   status: string;
+  work_start_time?: string | null;
+  work_end_time?: string | null;
+  required_work_hours?: number | null;
+  work_hours_metadata?: any | null;
 }
 
 interface EmployeeAttendanceModalProps {
@@ -272,16 +276,21 @@ export const EmployeeAttendanceModal: React.FC<EmployeeAttendanceModalProps> = (
     }
   }, [open]);
 
-  // Filter and calculate records for the selected employee (memoized to prevent infinite loops)
+  // Process records for the selected employee (memoized to prevent infinite loops)
+  // Note: attendanceRecords should already be filtered for the selected employee
   const records = useMemo(() => {
-    return attendanceRecords
-      .filter((rec) => rec.name === employeeName)
-      .map((rec) => ({
+    return attendanceRecords.map((rec) => {
+      // Use stored work hours settings if available, otherwise use current settings
+      const recordWorkHours = rec.required_work_hours || requiredWorkHours;
+      const recordWorkEndTime = rec.work_end_time || workEndTime;
+      
+      return {
         ...rec,
-        status: getAttendanceStatus(rec, requiredWorkHours, workEndTime),
+        status: getAttendanceStatus(rec, recordWorkHours, recordWorkEndTime),
         hoursRendered: getHoursRendered(rec),
-      }));
-  }, [attendanceRecords, employeeName, requiredWorkHours, workEndTime]);
+      };
+    });
+  }, [attendanceRecords, requiredWorkHours, workEndTime]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -295,12 +304,14 @@ export const EmployeeAttendanceModal: React.FC<EmployeeAttendanceModalProps> = (
     return { present, absent, late, undertime, total, attendanceRate };
   }, [records]);
 
-  // Export DTR handler (to be implemented)
+  // Export DTR handler
   const handleExportDTR = () => {
     exportEmployeeDTR({
       employeeName,
       employeePosition,
       records: records,
+      requiredWorkHours,
+      workEndTime,
     });
   };
 

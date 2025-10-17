@@ -134,7 +134,7 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="text-center md:text-left">
-                <h2 className="text-5xl font-bold text-gray-900">EPOL</h2>
+                <h2 className="text-5xl font-bold text-gray-900">iHelpers</h2>
                 <p className="text-gray-600 font-medium text-xl">Environmental Police</p>
               </div>
             </div>
